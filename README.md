@@ -15,7 +15,7 @@ Just add [`buffy`](https://hex.pm/packages/stord/buffy) to your `mix.exs` file l
 ```elixir
 def deps do
   [
-    {:buffy, "~> 1.0.0", organization: "stord"}
+    {:buffy, "~> 1.1.0", organization: "stord"}
   ]
 end
 ```
