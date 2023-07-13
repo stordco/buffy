@@ -1,31 +1,29 @@
-defmodule Buffy.Debounce do
+defmodule Buffy.Throttle do
   @moduledoc """
-  The `Buffy.Debounce` module will wait for a specified amount of time before
+  The `Buffy.Throttle` module will wait for a specified amount of time before
   invoking the function. If the function is called again before the time has
   elapsed, the timer will be reset and the function will be called again after
   the specified amount of time.
 
   ## Example Usage
 
-  You'll first need to create a module that will be used to debounce.
+  You'll first need to create a module that will be used to throttle.
 
       defmodule MyTask do
-        use Buffy.Debounce,
-          debounce: :timer.minutes(2)
+        use Buffy.Throttle,
+          throttle: :timer.minutes(2)
 
-        def handle_debounce(args) do
+        def handle_throttle(args) do
           # Do something with args
         end
       end
 
-  Next, you can use the `debounce/1` function with the registered module.
+  Next, you can use the `throttle/1` function with the registered module.
 
-      iex> MyTask.debounce(args)
+      iex> MyTask.throttle(args)
       :ok
 
   ## Options
-
-    - :debounce (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
 
     - `:registry_module` (`atom`) - Optional. A module that implements the `Registry` behaviour. If you are running in a distributed instance, you can set this value to `Horde.Registry`. Defaults to `Registry`.
 
@@ -37,19 +35,21 @@ defmodule Buffy.Debounce do
 
     - `:supervisor_name` (`atom`) - Optional. The name of the dynamic supervisor to use. Defaults to the built in Buffy dynamic supervisor, but if you are running in a distributed instance you can set this value to a named `Horde.DynamicSupervisor` process. Defaults to `Buffy.DynamicSupervisor`.
 
+    - :throttle (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
+
   ## Using with Horde
 
-  If you are running Elixir in a cluster, you can utilize `Horde` to only run one of your debounced functions at a time. To do this, you'll need to set the `:registry_module` and `:supervisor_module` options to `Horde.Registry` and `Horde.DynamicSupervisor` respectively. You'll also need to set the `:registry_name` and `:supervisor_name` options to the name of the Horde registry and dynamic supervisor you want to use.
+  If you are running Elixir in a cluster, you can utilize `Horde` to only run one of your throttled functions at a time. To do this, you'll need to set the `:registry_module` and `:supervisor_module` options to `Horde.Registry` and `Horde.DynamicSupervisor` respectively. You'll also need to set the `:registry_name` and `:supervisor_name` options to the name of the Horde registry and dynamic supervisor you want to use.
 
-        defmodule MyDebouncer do
-          use Buffy.Debounce,
-            debounce: :timer.minutes(2),
+        defmodule MyThrottler do
+          use Buffy.Throttle,
             registry_module: Horde.Registry,
             registry_name: MyApp.HordeRegistry,
             supervisor_module: Horde.DynamicSupervisor,
-            supervisor_name: MyApp.HordeDynamicSupervisor
+            supervisor_name: MyApp.HordeDynamicSupervisor,
+            throttle: :timer.minutes(2)
 
-          def handle_debounce(args) do
+          def handle_throttle(args) do
             # Do something with args
           end
         end
@@ -57,7 +57,7 @@ defmodule Buffy.Debounce do
   """
 
   @typedoc """
-  A list of arbitrary arguments that are used for the `c:handle_debounce/1`
+  A list of arbitrary arguments that are used for the `c:handle_throttle/1`
   function.
   """
   @type args :: term()
@@ -69,35 +69,35 @@ defmodule Buffy.Debounce do
   @type key :: term()
 
   @doc """
-  A function to call the debounce. This will always return `:ok` and wait
-  the configured `debounce` time before calling the `c:handle_debounce/1`
+  A function to call the throttle. This will always return a tuple of `{:ok, pid()}`
+  and wait the configured `throttle` time before calling the `c:handle_throttle/1`
   function.
   """
-  @callback debounce(args :: args()) :: :ok
+  @callback throttle(args :: args()) :: {:ok, pid()}
 
   @doc """
-  The function called after the debounce has completed. This function will
-  receive the arguments passed to the `debounce/1` function.
+  The function called after the throttle has completed. This function will
+  receive the arguments passed to the `throttle/1` function.
   """
-  @callback handle_debounce(args()) :: any()
+  @callback handle_throttle(args()) :: any()
 
   defmacro __using__(opts) do
-    debounce = Keyword.fetch!(opts, :debounce)
     registry_module = Keyword.get(opts, :registry_module, Registry)
     registry_name = Keyword.get(opts, :registry_name, Buffy.Registry)
     restart = Keyword.get(opts, :restart, :temporary)
     supervisor_module = Keyword.get(opts, :supervisor_module, DynamicSupervisor)
     supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
+    throttle = Keyword.fetch!(opts, :throttle)
 
     quote do
-      @behaviour Buffy.Debounce
+      @behaviour Buffy.Throttle
 
       use GenServer, restart: unquote(restart)
 
       require Logger
 
       @doc false
-      @spec start_link(Buffy.Debounce.args()) :: {:ok, pid} | :ignore
+      @spec start_link(Buffy.Throttle.args()) :: {:ok, pid} | :ignore
       def start_link(args) do
         key = :erlang.phash2(args)
         name = {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
@@ -108,40 +108,40 @@ defmodule Buffy.Debounce do
       end
 
       @doc """
-      Starts debouncing the given `t:Buffy.Debounce.key()` for the
-      module set `debounce` time. Returns `:ok`.
+      Starts debouncing the given `t:Buffy.Throttle.key()` for the
+      module set `throttle` time. Returns a tuple containing `:ok`
+      and the `t:pid()` of the throttle process.
 
       ## Examples
 
-          iex> debounce(:my_function_arg)
-          :ok
+          iex> throttle(:my_function_arg)
+          {:ok, #PID<0.123.0>}
 
       """
-      @impl Buffy.Debounce
-      @spec debounce(Buffy.Debounce.args()) :: :ok
-      def debounce(args) do
-        _ = unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, args})
-        :ok
+      @impl Buffy.Throttle
+      @spec throttle(Buffy.Throttle.args()) :: {:ok, pid()}
+      def throttle(args) do
+        unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, args})
       end
 
       @doc """
-      The function that runs after debounce has completed. This function will
-      be called with the `t:Buffy.Debounce.key()` and can return anything. The
+      The function that runs after throttle has completed. This function will
+      be called with the `t:Buffy.Throttle.key()` and can return anything. The
       return value is ignored. If an error is raised, it will be logged and
       ignored.
 
       ## Examples
 
-      A simple example of implementing the `c:Buffy.Debounce.handle_debounce/1`
+      A simple example of implementing the `c:Buffy.Throttle.handle_throttle/1`
       callback:
 
-          def handle_debounce(args) do
+          def handle_throttle(args) do
             # Do some work
           end
 
-      Handling errors in the `c:Buffy.Debounce.handle_debounce/1` callback:
+      Handling errors in the `c:Buffy.Throttle.handle_throttle/1` callback:
 
-          def handle_debounce(args) do
+          def handle_throttle(args) do
             # Do some work
           rescue
             e ->
@@ -149,32 +149,32 @@ defmodule Buffy.Debounce do
           end
 
       """
-      @impl Buffy.Debounce
-      @spec handle_debounce(Buffy.Debounce.args()) :: any()
-      def handle_debounce(_args) do
+      @impl Buffy.Throttle
+      @spec handle_throttle(Buffy.Throttle.args()) :: any()
+      def handle_throttle(_args) do
         raise RuntimeError,
-          message: "You must implement the `handle_debounce/1` function in your module."
+          message: "You must implement the `handle_throttle/1` function in your module."
       end
 
-      defoverridable handle_debounce: 1
+      defoverridable handle_throttle: 1
 
       @doc false
       @impl GenServer
-      @spec init(Buffy.Debounce.args()) :: {:ok, Buffy.Debounce.args()}
+      @spec init(Buffy.Throttle.args()) :: {:ok, Buffy.Throttle.args()}
       def init(args) do
-        Process.send_after(self(), :timeout, unquote(debounce))
+        Process.send_after(self(), :timeout, unquote(throttle))
         {:ok, args}
       end
 
       @doc false
       @impl GenServer
-      @spec handle_info(:timeout, Buffy.Debounce.args()) :: {:stop, :normal, Buffy.Debounce.args()}
+      @spec handle_info(:timeout, Buffy.Throttle.args()) :: {:stop, :normal, Buffy.Throttle.args()}
       def handle_info(:timeout, args) do
-        handle_debounce(args)
+        handle_throttle(args)
         {:stop, :normal, args}
       rescue
         e ->
-          Logger.error("Error in debounce: #{inspect(e)}")
+          Logger.error("Error in throttle: #{inspect(e)}")
           {:stop, :normal, args}
       end
     end
