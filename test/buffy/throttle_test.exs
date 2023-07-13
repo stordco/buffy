@@ -8,10 +8,10 @@ defmodule Buffy.ThrottleTest do
     :ok
   end
 
-  # Extend timeout for the 10_000 runs CI does + the Process.sleep call.
+  # Extend timeout for the number of CI runs + the Process.sleep call.
   # Because MyZeroDebouncer.debounce/1 is async, we need to sleep to ensure
   # the logic is ran.
-  @tag timeout: :timer.minutes(5)
+  @tag timeout: :timer.minutes(10)
   test "calls handle_debounce/1" do
     check all args <- StreamData.term() do
       assert {:ok, _pid} = MyZeroThrottler.throttle(args)
