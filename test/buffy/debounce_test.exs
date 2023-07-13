@@ -5,12 +5,13 @@ defmodule Buffy.DebounceTest do
 
   setup do
     spy(MyZeroDebouncer)
+    :ok
   end
 
   # Extend timeout for the 10_000 runs CI does + the Process.sleep call.
   # Because MyZeroDebouncer.debounce/1 is async, we need to sleep to ensure
   # the logic is ran.
-  @tag timeout: 20_000
+  @tag timeout: :timer.minutes(2)
   test "calls handle_debounce/1" do
     check all args <- StreamData.term() do
       assert :ok = MyZeroDebouncer.debounce(args)
