@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - main
-      - master
     paths:
       - .github/workflows/common-config-elixir.yaml
   repository_dispatch:
@@ -33,7 +32,7 @@ jobs:
           node-version: 16
 
       - name: Setup Elixir
-        uses: stordco/actions-elixir/setup@v1.2.3
+        uses: stordco/actions-elixir/setup@v1
         with:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           hex-token: ${{ secrets.HEX_API_KEY }}

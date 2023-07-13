@@ -3,5 +3,6 @@
 [
   import_deps: [:patch, :stream_data],
   inputs: ["*.{ex,exs}", "{config,lib,priv,test}/**/*.{ex,exs}"],
-  line_length: 120
+  line_length: 120,
+  plugins: []
 ]
