@@ -2,6 +2,11 @@
 
 Buffy is a small library of Elixir modules to assist in throttling and debouncing function calling.
 
+## Roadmap
+
+- [ ] Allow limiting concurrency of running tasks
+- [ ] Create a throttle module
+
 ## Installation
 
 Just add [`buffy`](https://hex.pm/packages/stord/buffy) to your `mix.exs` file like so:

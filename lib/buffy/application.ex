@@ -1,7 +1,7 @@
 defmodule Buffy.Application do
   @moduledoc """
   The Buffy supervisor responsible for starting the default
-  registry and task supervisor.
+  `Registry` and `DynamicSupervisor`.
   """
 
   use Application
@@ -11,7 +11,7 @@ defmodule Buffy.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: Buffy.Registry},
-      {Task.Supervisor, name: Buffy.TaskSupervisor}
+      {DynamicSupervisor, name: Buffy.DynamicSupervisor}
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one)

@@ -3,13 +3,12 @@ defmodule Buffy.DebounceTest do
   use Patch
 
   setup do
-    start_supervised!(MyDebouncer)
-    spy(MyDebouncer)
+    spy(MyZeroDebouncer)
   end
 
-  test "calls handle_apply/1" do
-    assert :ok = MyDebouncer.debounce({:test_arg})
+  test "calls handle_debounce/1" do
+    assert :ok = MyZeroDebouncer.debounce({:test_arg})
     Process.sleep(1)
-    assert_called_once(MyDebouncer.handle_debounce({:test_arg}))
+    assert_called_once(MyZeroDebouncer.handle_debounce({:test_arg}))
   end
 end

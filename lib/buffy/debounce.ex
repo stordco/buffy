@@ -11,8 +11,7 @@ defmodule Buffy.Debounce do
 
       defmodule MyTask do
         use Buffy.Debounce,
-          concurrency: 0,
-          debounce: 0
+          debounce: :timer.minutes(2)
 
         def handle_debounce(args) do
           # Do something with args
@@ -26,74 +25,143 @@ defmodule Buffy.Debounce do
 
   ## Options
 
-    - :concurrency (`non_neg_integer` or `:infinity`) - Required. The maximum number of functions that will be ran at once. By default this is set to :infinity which means there are no limits to the number of functions that can be ran at once.
-
-      If you are using resources like a database or API, then you might want to limit the number of functions that can be ran at once. Just set this value to a non-negative integer.
-
-      The default value is :infinity.
-
     - :debounce (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
+
+    - `:registry_module` (`atom`) - Optional. A module that implements the `Registry` behaviour. If you are running in a distributed instance, you can set this value to `Horde.Registry`. Defaults to `Registry`.
+
+    - `:registry_name` (`atom`) - Optional. The name of the registry to use. Defaults to the built in Buffy registry, but if you are running in a distributed instance you can set this value to a named `Horde.Registry` process. Defaults to `Buffy.Registry`.
+
+    - `:restart` (`:permanent` | `:temporary` | `:transient`) - Optional. The restart strategy to use for the GenServer. Defaults to `:temporary`.
+
+    - `:supervisor_module` (`atom`) - Optional. A module that implements the `DynamicSupervisor` behaviour. If you are running in a distributed instance, you can set this value to `Horde.DynamicSupervisor`. Defaults to `DynamicSupervisor`.
+
+    - `:supervisor_name` (`atom`) - Optional. The name of the dynamic supervisor to use. Defaults to the built in Buffy dynamic supervisor, but if you are running in a distributed instance you can set this value to a named `Horde.DynamicSupervisor` process. Defaults to `Buffy.DynamicSupervisor`.
+
+  ## Using with Horde
+
+  If you are running Elixir in a cluster, you can utilize `Horde` to only run one of your debounced functions at a time. To do this, you'll need to set the `:registry_module` and `:supervisor_module` options to `Horde.Registry` and `Horde.DynamicSupervisor` respectively. You'll also need to set the `:registry_name` and `:supervisor_name` options to the name of the Horde registry and dynamic supervisor you want to use.
+
+        defmodule MyDebouncer do
+          use Buffy.Debounce,
+            debounce: :timer.minutes(2),
+            registry_module: Horde.Registry,
+            registry_name: MyApp.HordeRegistry,
+            supervisor_module: Horde.DynamicSupervisor,
+            supervisor_name: MyApp.HordeDynamicSupervisor
+
+          def handle_debounce(args) do
+            # Do something with args
+          end
+        end
+
   """
 
-  defmacro __using__(module_opts) do
-    quote location: :keep do
-      use GenServer
+  @typedoc """
+  A unique key for debouncing. This is used to register the GenServer with
+  and will be the value called in the `c:handle_debounce/1` function.
+  """
+  @type key :: term()
 
-      @typedoc "Internal state module."
-      @type state :: %{
-              concurrency: non_neg_integer() | :infinity,
-              debounce: non_neg_integer(),
-              timer_references: %{required(binary()) => reference()},
-              arg_references: %{required(binary()) => term()}
-            }
+  @doc """
+  The function called after the debounce has completed. This function will
+  receive the arguments passed to the `debounce/1` function.
+  """
+  @callback handle_debounce(term()) :: any()
 
-      def start_link(opts) do
-        full_opts = Keyword.merge(unquote(module_opts), opts)
-        GenServer.start_link(__MODULE__, full_opts, name: __MODULE__)
+  defmacro __using__(opts) do
+    debounce = Keyword.fetch!(opts, :debounce)
+    registry_module = Keyword.get(opts, :registry_module, Registry)
+    registry_name = Keyword.get(opts, :registry_name, Buffy.Registry)
+    restart = Keyword.get(opts, :restart, :temporary)
+    supervisor_module = Keyword.get(opts, :supervisor_module, DynamicSupervisor)
+    supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
+
+    quote do
+      @behaviour Buffy.Debounce
+
+      use GenServer, restart: unquote(restart)
+
+      require Logger
+
+      @doc false
+      @spec start_link(Buffy.Debounce.key()) :: {:ok, pid} | :ignore
+      def start_link(key) do
+        name = {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
+
+        with {:error, {:already_started, _pid}} <- GenServer.start_link(__MODULE__, key, name: name) do
+          :ignore
+        end
       end
 
       @doc """
-      Debounces the given arguments.
+      Starts debouncing the given `t:Buffy.Debounce.key()` for the
+      module set `debounce` time. Returns `:ok`.
 
       ## Examples
 
-          iex> debounce(args)
+          iex> debounce(:my_function_arg)
           :ok
 
       """
-      def debounce(args) do
-        GenServer.cast(__MODULE__, {:debounce, args})
+      @spec debounce(Buffy.Debounce.key()) :: :ok
+      def debounce(key) do
+        _ = apply(unquote(supervisor_module), :start_child, [unquote(supervisor_name), {__MODULE__, key}])
+        :ok
       end
 
-      @doc false
-      @spec init(Keyword.t()) :: {:ok, state()}
-      def init(opts) do
-        concurrency = Keyword.fetch!(opts, :concurrency)
-        debounce = Keyword.fetch!(opts, :debounce)
+      @doc """
+      The function that runs after debounce has completed. This function will
+      be called with the `t:Buffy.Debounce.key()` and can return anything. The
+      return value is ignored. If an error is raised, it will be logged and
+      ignored.
 
-        {:ok,
-         %{
-           concurrency: concurrency,
-           debounce: debounce,
-           timer_references: %{},
-           arg_references: %{}
-         }}
-      end
+      ## Examples
 
-      @doc false
-      @spec handle_cast({:debounce, term()}, state()) :: {:noreply, state()}
-      def handle_cast({:debounce, args}, state) do
-        # TODO: actually debounce
-        apply(__MODULE__, :handle_debounce, [args])
-        {:noreply, state}
-      end
+      A simple example of implementing the `c:Buffy.Debounce.handle_debounce/1`
+      callback:
 
-      def handle_debounce(_args) do
+          def handle_debounce(args) do
+            # Do some work
+          end
+
+      Handling errors in the `c:Buffy.Debounce.handle_debounce/1` callback:
+
+          def handle_debounce(args) do
+            # Do some work
+          rescue
+            e ->
+              # Do something with a raised error
+          end
+
+      """
+      @impl Buffy.Debounce
+      @spec handle_debounce(Buffy.Debounce.key()) :: any()
+      def handle_debounce(_key) do
         raise RuntimeError,
           message: "You must implement the `handle_debounce/1` function in your module."
       end
 
-      defoverridable(handle_debounce: 1)
+      defoverridable handle_debounce: 1
+
+      @doc false
+      @impl GenServer
+      @spec init(Buffy.Debounce.key()) :: {:ok, Buffy.Debounce.key()}
+      def init(key) do
+        Process.send_after(self(), :timeout, unquote(debounce))
+        {:ok, key}
+      end
+
+      @doc false
+      @impl GenServer
+      @spec handle_info(:timeout, Buffy.Debounce.key()) :: {:stop, :normal, Buffy.Debounce.key()}
+      def handle_info(:timeout, key) do
+        handle_debounce(key)
+        {:stop, :normal, key}
+      rescue
+        e ->
+          Logger.error("Error in debounce: #{inspect(e)}")
+          {:stop, :normal, key}
+      end
     end
   end
 end
