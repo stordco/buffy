@@ -40,7 +40,8 @@ defmodule Buffy.MixProject do
       {:dialyxir, "~> 1.1", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.21.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.28", only: [:dev, :test], runtime: false},
-      {:patch, "~> 0.12.0", only: [:dev, :test], runtime: false}
+      {:patch, "~> 0.12.0", only: [:dev, :test], runtime: false},
+      {:stream_data, "~> 0.6.0", only: [:dev, :test], runtime: false}
     ]
   end
 

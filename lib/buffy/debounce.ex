@@ -57,16 +57,29 @@ defmodule Buffy.Debounce do
   """
 
   @typedoc """
-  A unique key for debouncing. This is used to register the GenServer with
-  and will be the value called in the `c:handle_debounce/1` function.
+  A list of arbitrary arguments that are used for the `c:handle_debounce/1`
+  function.
+  """
+  @type args :: term()
+
+  @typedoc """
+  A unique key for debouncing. This is used for GenServer uniqueness and is
+  generated from hashing all of the args.
   """
   @type key :: term()
+
+  @doc """
+  A function to call the debounce. This will always return `:ok` and wait
+  the configured `debounce` time before calling the `c:handle_debounce/1`
+  function.
+  """
+  @callback debounce(args :: args()) :: :ok
 
   @doc """
   The function called after the debounce has completed. This function will
   receive the arguments passed to the `debounce/1` function.
   """
-  @callback handle_debounce(term()) :: any()
+  @callback handle_debounce(args()) :: any()
 
   defmacro __using__(opts) do
     debounce = Keyword.fetch!(opts, :debounce)
@@ -84,11 +97,12 @@ defmodule Buffy.Debounce do
       require Logger
 
       @doc false
-      @spec start_link(Buffy.Debounce.key()) :: {:ok, pid} | :ignore
-      def start_link(key) do
+      @spec start_link(Buffy.Debounce.args()) :: {:ok, pid} | :ignore
+      def start_link(args) do
+        key = :erlang.phash2(args)
         name = {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
 
-        with {:error, {:already_started, _pid}} <- GenServer.start_link(__MODULE__, key, name: name) do
+        with {:error, {:already_started, _pid}} <- GenServer.start_link(__MODULE__, args, name: name) do
           :ignore
         end
       end
@@ -103,9 +117,10 @@ defmodule Buffy.Debounce do
           :ok
 
       """
-      @spec debounce(Buffy.Debounce.key()) :: :ok
-      def debounce(key) do
-        _ = apply(unquote(supervisor_module), :start_child, [unquote(supervisor_name), {__MODULE__, key}])
+      @impl Buffy.Debounce
+      @spec debounce(Buffy.Debounce.args()) :: :ok
+      def debounce(args) do
+        _ = unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, args})
         :ok
       end
 
@@ -135,8 +150,8 @@ defmodule Buffy.Debounce do
 
       """
       @impl Buffy.Debounce
-      @spec handle_debounce(Buffy.Debounce.key()) :: any()
-      def handle_debounce(_key) do
+      @spec handle_debounce(Buffy.Debounce.args()) :: any()
+      def handle_debounce(_args) do
         raise RuntimeError,
           message: "You must implement the `handle_debounce/1` function in your module."
       end
@@ -145,22 +160,22 @@ defmodule Buffy.Debounce do
 
       @doc false
       @impl GenServer
-      @spec init(Buffy.Debounce.key()) :: {:ok, Buffy.Debounce.key()}
-      def init(key) do
+      @spec init(Buffy.Debounce.args()) :: {:ok, Buffy.Debounce.args()}
+      def init(args) do
         Process.send_after(self(), :timeout, unquote(debounce))
-        {:ok, key}
+        {:ok, args}
       end
 
       @doc false
       @impl GenServer
-      @spec handle_info(:timeout, Buffy.Debounce.key()) :: {:stop, :normal, Buffy.Debounce.key()}
-      def handle_info(:timeout, key) do
-        handle_debounce(key)
-        {:stop, :normal, key}
+      @spec handle_info(:timeout, Buffy.Debounce.args()) :: {:stop, :normal, Buffy.Debounce.args()}
+      def handle_info(:timeout, args) do
+        handle_debounce(args)
+        {:stop, :normal, args}
       rescue
         e ->
           Logger.error("Error in debounce: #{inspect(e)}")
-          {:stop, :normal, key}
+          {:stop, :normal, args}
       end
     end
   end

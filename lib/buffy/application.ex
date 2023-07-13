@@ -11,7 +11,7 @@ defmodule Buffy.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: Buffy.Registry},
-      {DynamicSupervisor, name: Buffy.DynamicSupervisor}
+      {DynamicSupervisor, strategy: :one_for_one, name: Buffy.DynamicSupervisor}
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one)
