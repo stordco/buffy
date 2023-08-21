@@ -47,8 +47,8 @@ defmodule Buffy.MixProject do
 
   defp package do
     [
-      files: ~w(lib mix.exs .formatter.exs README.md CHANGELOG.md),
-      licenses: ["UNLICENSED"],
+      files: ~w(lib mix.exs .formatter.exs README.md CHANGELOG.md LICENSE.md),
+      licenses: ["MIT"],
       links: %{
         Changelog: "https://github.com/stordco/buffy/releases",
         GitHub: "https://github.com/stordco/buffy"
@@ -60,7 +60,7 @@ defmodule Buffy.MixProject do
   defp docs do
     [
       before_closing_body_tag: &before_closing_body_tag/1,
-      extras: ["README.md", "CHANGELOG.md"],
+      extras: ["README.md", "CHANGELOG.md", "LICENSE.md"],
       main: "readme"
     ]
   end
