@@ -52,8 +52,7 @@ defmodule Buffy.MixProject do
       links: %{
         Changelog: "https://github.com/stordco/buffy/releases",
         GitHub: "https://github.com/stordco/buffy"
-      },
-      organization: "stord"
+      }
     ]
   end
 
