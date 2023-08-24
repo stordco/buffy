@@ -5,6 +5,7 @@ defmodule Buffy.ThrottleTest do
 
   setup do
     spy(MyZeroThrottler)
+    spy(MySlowThrottler)
     :ok
   end
 
@@ -18,6 +19,12 @@ defmodule Buffy.ThrottleTest do
       Process.sleep(1)
       assert_called MyZeroThrottler.handle_throttle(args)
     end
+  end
+
+  test "throttles handle_debounce/1" do
+    for _ <- 1..200, do: MySlowThrottler.throttle(:testing)
+    Process.sleep(100)
+    assert_called_once MySlowThrottler.handle_throttle(:testing)
   end
 
   describe ":telemetry" do
@@ -68,15 +75,14 @@ defmodule Buffy.ThrottleTest do
     end
 
     test "emits [:buffy, :throttle, :handle, :exception]" do
-      patch(MyZeroThrottler, :handle_throttle, fn _ -> raise "oops" end)
-      MyZeroThrottler.throttle(:exception)
+      MyZeroThrottler.throttle(:raise)
 
       assert_receive {[:buffy, :throttle, :handle, :exception], _ref, %{duration: _},
                       %{
-                        args: :exception,
+                        args: :raise,
                         key: _,
                         kind: :error,
-                        reason: %RuntimeError{message: "oops"},
+                        reason: %RuntimeError{message: ":raise"},
                         module: MyZeroThrottler
                       }}
     end
