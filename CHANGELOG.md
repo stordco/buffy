@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/stordco/buffy/compare/v1.1.0...v1.2.0) (2023-08-24)
+
+
+### Features
+
+* Add telemetry to the throttle module ([#7](https://github.com/stordco/buffy/issues/7)) ([74539d8](https://github.com/stordco/buffy/commit/74539d86ea41c531d4743ad57f614fd0f359679e))
+
+
+### Miscellaneous
+
+* Add MIT license ([#5](https://github.com/stordco/buffy/issues/5)) ([fc4306a](https://github.com/stordco/buffy/commit/fc4306afb90b301860f549afe8950bf96aff9f62))
+* Sync files with stordco/common-config-elixir ([#3](https://github.com/stordco/buffy/issues/3)) ([d8bdce2](https://github.com/stordco/buffy/commit/d8bdce2a9114885c8993e45d5b80df8008dc84a4))
+* Update README ([#6](https://github.com/stordco/buffy/issues/6)) ([a874e46](https://github.com/stordco/buffy/commit/a874e46bcb35fe6ed7244e6d831ec8d620fa35ad))
+
 ## [1.1.0](https://github.com/stordco/buffy/compare/v1.0.0...v1.1.0) (2023-07-13)
 
 
