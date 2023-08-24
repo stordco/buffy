@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/stordco/buffy/compare/v1.2.0...v1.2.1) (2023-08-24)
+
+
+### Miscellaneous
+
+* Make buffy public ([#8](https://github.com/stordco/buffy/issues/8)) ([d1eb14f](https://github.com/stordco/buffy/commit/d1eb14fde266b97cf2e84d65914d568e73d827b8))
+
 ## [1.2.0](https://github.com/stordco/buffy/compare/v1.1.0...v1.2.0) (2023-08-24)
 
 
