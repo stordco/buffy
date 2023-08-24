@@ -6,7 +6,7 @@ Buffy is a small library of Elixir modules to assist in throttling and debouncin
 
 - [ ] Allow limiting concurrency of running tasks
 - [ ] Create a debounce module
-- [ ] Telemetry instrumentation
+- [X] Telemetry instrumentation
 
 ## Installation
 
