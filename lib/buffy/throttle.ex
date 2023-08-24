@@ -68,6 +68,25 @@ defmodule Buffy.Throttle do
           end
         end
 
+  ## Telemetry
+
+  These are the events that are called by the `Buffy.Throttle` module:
+
+  - `[:buffy, :throttle, :throttle]` - Emitted when the `throttle/1` function is called.
+  - `[:buffy, :throttle, :handle, :start]` - Emitted at the start of the `handle_throttle/1` function.
+  - `[:buffy, :throttle, :handle, :stop]` - Emitted at the end of the `handle_throttle/1` function.
+  - `[:buffy, :throttle, :handle, :exception]` - Emitted when an error is raised in the `handle_throttle/1` function.
+
+  All of these events will have the following metadata:
+
+  - `:args` - The arguments passed to the `throttle/1` function.
+  - `:key` - A hash of the passed arguments used to deduplicate the throttled function.
+  - `:module` - The module using `Buffy.Throttle`.
+
+  With the additional metadata for `[:buffy, :throttle, :handle, :stop]`:
+
+  - `:result` - The return value of the `handle_throttle/1` function.
+
   """
 
   @typedoc """
@@ -81,6 +100,11 @@ defmodule Buffy.Throttle do
   generated from hashing all of the args.
   """
   @type key :: term()
+
+  @typedoc """
+  Internal state that `Buffy.Throttle` keeps.
+  """
+  @type state :: {key(), args()}
 
   @doc """
   A function to call the throttle. This will always return a tuple of `{:ok, pid()}`
@@ -111,13 +135,12 @@ defmodule Buffy.Throttle do
       require Logger
 
       @doc false
-      @spec start_link(Buffy.Throttle.args()) :: {:ok, pid} | :ignore
-      def start_link(args) do
-        key = :erlang.phash2(args)
+      @spec start_link(Buffy.Throttle.state()) :: {:ok, pid} | {:error, term()}
+      def start_link({key, args}) do
         name = {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
 
-        with {:error, {:already_started, _pid}} <- GenServer.start_link(__MODULE__, args, name: name) do
-          :ignore
+        with {:error, {:already_started, pid}} <- GenServer.start_link(__MODULE__, {key, args}, name: name) do
+          {:ok, pid}
         end
       end
 
@@ -135,7 +158,15 @@ defmodule Buffy.Throttle do
       @impl Buffy.Throttle
       @spec throttle(Buffy.Throttle.args()) :: {:ok, pid()}
       def throttle(args) do
-        unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, args})
+        key = :erlang.phash2(args)
+
+        :telemetry.execute(
+          [:buffy, :throttle, :throttle],
+          %{count: 1},
+          %{args: args, key: key, module: __MODULE__}
+        )
+
+        unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, {key, args}})
       end
 
       @doc """
@@ -174,22 +205,30 @@ defmodule Buffy.Throttle do
 
       @doc false
       @impl GenServer
-      @spec init(Buffy.Throttle.args()) :: {:ok, Buffy.Throttle.args()}
-      def init(args) do
+      @spec init(Buffy.Throttle.state()) :: {:ok, Buffy.Throttle.state()}
+      def init({key, args}) do
         Process.send_after(self(), :timeout, unquote(throttle))
-        {:ok, args}
+        {:ok, {key, args}}
       end
 
       @doc false
       @impl GenServer
-      @spec handle_info(:timeout, Buffy.Throttle.args()) :: {:stop, :normal, Buffy.Throttle.args()}
-      def handle_info(:timeout, args) do
-        handle_throttle(args)
-        {:stop, :normal, args}
+      @spec handle_info(:timeout, Buffy.Throttle.state()) :: {:stop, :normal, Buffy.Throttle.state()}
+      def handle_info(:timeout, {key, args}) do
+        :telemetry.span(
+          [:buffy, :throttle, :handle],
+          %{args: args, key: key, module: __MODULE__},
+          fn ->
+            result = handle_throttle(args)
+            {result, %{args: args, key: key, module: __MODULE__, result: result}}
+          end
+        )
+
+        {:stop, :normal, {key, args}}
       rescue
         e ->
           Logger.error("Error in throttle: #{inspect(e)}")
-          {:stop, :normal, args}
+          {:stop, :normal, {key, args}}
       end
     end
   end
