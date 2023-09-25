@@ -140,7 +140,7 @@ defmodule Buffy.Throttle do
         name = {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
 
         with {:error, {:already_started, pid}} <- GenServer.start_link(__MODULE__, {key, args}, name: name) do
-          {:ok, pid}
+          :ignore
         end
       end
 
@@ -166,7 +166,14 @@ defmodule Buffy.Throttle do
           %{args: args, key: key, module: __MODULE__}
         )
 
-        unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, {key, args}})
+        case unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, {key, args}}) do
+          {:ok, pid} ->
+            {:ok, pid}
+
+          :ignore ->
+            [{pid, _}] = unquote(registry_module).lookup(unquote(registry_name), {__MODULE__, key})
+            {:ok, pid}
+        end
       end
 
       @doc """
