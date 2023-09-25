@@ -21,6 +21,11 @@ defmodule Buffy.ThrottleTest do
     end
   end
 
+  test "returns pid of already running process" do
+    {:ok, pid} = MySlowThrottler.throttle(:testing)
+    assert {:ok, ^pid} = MySlowThrottler.throttle(:testing)
+  end
+
   test "throttles handle_debounce/1" do
     for _ <- 1..200, do: MySlowThrottler.throttle(:testing)
     Process.sleep(100)
