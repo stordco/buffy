@@ -158,7 +158,7 @@ defmodule Buffy.Throttle do
       @impl Buffy.Throttle
       @spec throttle(Buffy.Throttle.args()) :: {:ok, pid()}
       def throttle(args) do
-        key = :erlang.phash2(args)
+        key = :erlang.phash2(:erlang.term_to_binary(args))
 
         :telemetry.execute(
           [:buffy, :throttle, :throttle],
