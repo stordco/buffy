@@ -10,7 +10,7 @@ Buffy is a small library of Elixir modules to assist in throttling and debouncin
 
 ## Installation
 
-Just add [`buffy`](https://hex.pm/packages/stord/buffy) to your `mix.exs` file like so:
+Just add [`buffy`](https://hex.pm/packages/buffy) to your `mix.exs` file like so:
 
 <!-- {x-release-please-start-version} -->
 ```elixir
