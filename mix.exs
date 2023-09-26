@@ -6,7 +6,7 @@ defmodule Buffy.MixProject do
       app: :buffy,
       name: "Buffy",
       description: "Buffy the Process Slayer",
-      version: "1.2.1",
+      version: "1.2.2",
       elixir: "~> 1.11",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,

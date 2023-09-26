@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.2](https://github.com/stordco/buffy/compare/v1.2.1...v1.2.2) (2023-09-26)
+
+
+### Bug Fixes
+
+* Do not double supervise throttle module ([#13](https://github.com/stordco/buffy/issues/13)) ([ce046ba](https://github.com/stordco/buffy/commit/ce046bab47f6a622aad586af59f9caf061c99e28))
+* Ensure to always hash binary version of args ([#14](https://github.com/stordco/buffy/issues/14)) ([6216805](https://github.com/stordco/buffy/commit/6216805da569a90e42b2b40693934e3a3d7abbc9))
+
+
+### Miscellaneous
+
+* Sync files with stordco/common-config-elixir ([#10](https://github.com/stordco/buffy/issues/10)) ([930fabe](https://github.com/stordco/buffy/commit/930fabef4d0815cfe144893091537d3405a12629))
+* Sync files with stordco/common-config-elixir ([#12](https://github.com/stordco/buffy/issues/12)) ([7d190da](https://github.com/stordco/buffy/commit/7d190da93eaaf2be765f0b6a31ff9c419f51a06e))
+
 ## [1.2.1](https://github.com/stordco/buffy/compare/v1.2.0...v1.2.1) (2023-08-24)
 
 
