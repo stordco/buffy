@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.0.0](https://github.com/stordco/buffy/compare/v1.2.2...v2.0.0) (2023-10-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* `Buffy.Throttle.throttle/1` will now return `:ok` instead of `{:ok, pid}`
+
+### Bug Fixes
+
+* Return :ok for already started throttle processes ([#20](https://github.com/stordco/buffy/issues/20)) ([07909be](https://github.com/stordco/buffy/commit/07909be0e65c3afb088b6d356862c597912ea157))
+
+
+### Miscellaneous
+
+* Remove old publish workflow ([#15](https://github.com/stordco/buffy/issues/15)) ([4b10fec](https://github.com/stordco/buffy/commit/4b10fec5cf76a4ff3e28a153bf91d126d203cfee))
+* Sync files with stordco/common-config-elixir ([#18](https://github.com/stordco/buffy/issues/18)) ([bfe20fd](https://github.com/stordco/buffy/commit/bfe20fd470e7c70963e3770bf14f744f35843300))
+* Sync files with stordco/common-config-elixir ([#19](https://github.com/stordco/buffy/issues/19)) ([7395018](https://github.com/stordco/buffy/commit/73950186902771e381165b253ab41c94730b8362))
+* Update Hex Link in README.md ([#17](https://github.com/stordco/buffy/issues/17)) ([68927c6](https://github.com/stordco/buffy/commit/68927c6b8f42fa4e6a21c0323592c10bfeb7f8e2))
+
 ## [1.2.2](https://github.com/stordco/buffy/compare/v1.2.1...v1.2.2) (2023-09-26)
 
 
