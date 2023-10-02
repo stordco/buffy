@@ -15,15 +15,10 @@ defmodule Buffy.ThrottleTest do
   @tag timeout: :timer.minutes(10)
   test "calls handle_debounce/1" do
     check all args <- StreamData.term() do
-      assert {:ok, _pid} = MyZeroThrottler.throttle(args)
+      assert :ok = MyZeroThrottler.throttle(args)
       Process.sleep(1)
       assert_called MyZeroThrottler.handle_throttle(args)
     end
-  end
-
-  test "returns pid of already running process" do
-    {:ok, pid} = MySlowThrottler.throttle(:testing)
-    assert {:ok, ^pid} = MySlowThrottler.throttle(:testing)
   end
 
   test "throttles handle_debounce/1" do
