@@ -156,7 +156,7 @@ defmodule Buffy.Throttle do
 
       """
       @impl Buffy.Throttle
-      @spec throttle(Buffy.Throttle.args()) :: {:ok, pid()}
+      @spec throttle(Buffy.Throttle.args()) :: :ok | {:error, term()}
       def throttle(args) do
         key = args |> :erlang.term_to_binary() |> :erlang.phash2()
 
@@ -167,12 +167,9 @@ defmodule Buffy.Throttle do
         )
 
         case unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, {key, args}}) do
-          {:ok, pid} ->
-            {:ok, pid}
-
-          :ignore ->
-            [{pid, _}] = unquote(registry_module).lookup(unquote(registry_name), {__MODULE__, key})
-            {:ok, pid}
+          {:ok, pid} -> :ok
+          :ignore -> :ok
+          result -> result
         end
       end
 
