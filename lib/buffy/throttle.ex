@@ -107,11 +107,11 @@ defmodule Buffy.Throttle do
   @type state :: {key(), args()}
 
   @doc """
-  A function to call the throttle. This will always return a tuple of `{:ok, pid()}`
+  A function to call the throttle. This will start
   and wait the configured `throttle` time before calling the `c:handle_throttle/1`
   function.
   """
-  @callback throttle(args :: args()) :: {:ok, pid()}
+  @callback throttle(args :: args()) :: :ok | {:error, term()}
 
   @doc """
   The function called after the throttle has completed. This function will
