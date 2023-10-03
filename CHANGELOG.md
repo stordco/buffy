@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/stordco/buffy/compare/v2.0.0...v2.0.1) (2023-10-03)
+
+
+### Bug Fixes
+
+* Update callback to match spec ([#21](https://github.com/stordco/buffy/issues/21)) ([5902653](https://github.com/stordco/buffy/commit/59026530d3daf561e209d441b3b98dd1634b2aaa))
+
 ## [2.0.0](https://github.com/stordco/buffy/compare/v1.2.2...v2.0.0) (2023-10-02)
 
 
