@@ -39,6 +39,8 @@ defmodule Buffy.Throttle do
 
   ## Options
 
+    - `:jitter` (`integer`) - Optional. The amount of jitter or randomosity to add to the throttle function handle. This value is in milliseconds. Defaults to `0`.
+
     - `:registry_module` (`atom`) - Optional. A module that implements the `Registry` behaviour. If you are running in a distributed instance, you can set this value to `Horde.Registry`. Defaults to `Registry`.
 
     - `:registry_name` (`atom`) - Optional. The name of the registry to use. Defaults to the built in Buffy registry, but if you are running in a distributed instance you can set this value to a named `Horde.Registry` process. Defaults to `Buffy.Registry`.
@@ -49,7 +51,7 @@ defmodule Buffy.Throttle do
 
     - `:supervisor_name` (`atom`) - Optional. The name of the dynamic supervisor to use. Defaults to the built in Buffy dynamic supervisor, but if you are running in a distributed instance you can set this value to a named `Horde.DynamicSupervisor` process. Defaults to `Buffy.DynamicSupervisor`.
 
-    - :throttle (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
+    - :throttle (`non_neg_integer`) - Required. The minimum amount of time to wait before invoking the function. This value is in milliseconds. The actual run time could be longer than this value based on the `:jitter` option.
 
   ## Using with Horde
 
@@ -73,6 +75,7 @@ defmodule Buffy.Throttle do
   These are the events that are called by the `Buffy.Throttle` module:
 
   - `[:buffy, :throttle, :throttle]` - Emitted when the `throttle/1` function is called.
+  - `[:buffy, :throttle, :handle, :jitter]` - Emitted before the `handle_throttle/1` function is called with the amount of jitter added to the throttle.
   - `[:buffy, :throttle, :handle, :start]` - Emitted at the start of the `handle_throttle/1` function.
   - `[:buffy, :throttle, :handle, :stop]` - Emitted at the end of the `handle_throttle/1` function.
   - `[:buffy, :throttle, :handle, :exception]` - Emitted when an error is raised in the `handle_throttle/1` function.
@@ -120,6 +123,7 @@ defmodule Buffy.Throttle do
   @callback handle_throttle(args()) :: any()
 
   defmacro __using__(opts) do
+    jitter = Keyword.get(opts, :jitter, 0)
     registry_module = Keyword.get(opts, :registry_module, Registry)
     registry_name = Keyword.get(opts, :registry_name, Buffy.Registry)
     restart = Keyword.get(opts, :restart, :temporary)
@@ -219,6 +223,17 @@ defmodule Buffy.Throttle do
       @impl GenServer
       @spec handle_info(:timeout, Buffy.Throttle.state()) :: {:stop, :normal, Buffy.Throttle.state()}
       def handle_info(:timeout, {key, args}) do
+        selected_jitter = 1 - :rand.uniform(unquote(jitter) + 1)
+
+        :telemetry.execute([:buffy, :throttle, :handle, :jitter], %{
+          args: args,
+          jitter: selected_jitter,
+          key: key,
+          module: __MODULE__
+        })
+
+        Process.sleep(selected_jitter)
+
         :telemetry.span(
           [:buffy, :throttle, :handle],
           %{args: args, key: key, module: __MODULE__},
