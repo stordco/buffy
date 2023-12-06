@@ -223,7 +223,7 @@ defmodule Buffy.Throttle do
       @impl GenServer
       @spec handle_info(:timeout, Buffy.Throttle.state()) :: {:stop, :normal, Buffy.Throttle.state()}
       def handle_info(:timeout, {key, args}) do
-        selected_jitter = :rand.uniform(unquote(jitter) + 1) - 1
+        selected_jitter = min(:rand.uniform(unquote(jitter) + 1) - 1, 0)
 
         :telemetry.execute([:buffy, :throttle, :handle, :jitter], %{jitter: selected_jitter}, %{
           args: args,
