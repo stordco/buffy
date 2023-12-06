@@ -4,8 +4,8 @@ defmodule Buffy.ThrottleTest do
   use ExUnitProperties
 
   setup do
-    spy(MyZeroThrottler)
     spy(MySlowThrottler)
+    spy(MyZeroThrottler)
     :ok
   end
 
@@ -32,6 +32,7 @@ defmodule Buffy.ThrottleTest do
       _ref =
         :telemetry_test.attach_event_handlers(self(), [
           [:buffy, :throttle, :throttle],
+          [:buffy, :throttle, :handle, :jitter],
           [:buffy, :throttle, :handle, :start],
           [:buffy, :throttle, :handle, :stop],
           [:buffy, :throttle, :handle, :exception]
@@ -49,6 +50,19 @@ defmodule Buffy.ThrottleTest do
                         key: _,
                         module: MyZeroThrottler
                       }}
+    end
+
+    test "emits [:buffy, :throttle, :handle, :jitter]" do
+      MyJitterThrottler.throttle(:foo)
+
+      assert_receive {[:buffy, :throttle, :handle, :jitter], _ref, measurements,
+                      %{
+                        args: :foo,
+                        key: _,
+                        module: MyJitterThrottler
+                      }}
+
+      assert measurements.jitter >= 0
     end
 
     test "emits [:buffy, :throttle, :handle, :start]" do
