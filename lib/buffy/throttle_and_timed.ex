@@ -266,7 +266,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc false
       @impl GenServer
-      @spec init(Buffy.ThrottleAndTimed.state()) :: {:ok, Buffy.ThrottleAndTimed.state()}
+      @spec init({ThrottleAndTimed.key(), ThrottleAndTimed.args()}) :: {:ok, Buffy.ThrottleAndTimed.state()}
       def init({key, args}) do
         Process.send_after(self(), :timeout, unquote(throttle))
         {:ok, %{key: key, args: args, work_status: :scheduled}}
@@ -323,8 +323,6 @@ defmodule Buffy.ThrottleAndTimed do
 
         ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(loop_interval, return_tuple)
       end
-
-      defp maybe_add_inbox_timeout_and_update_work_status(return_tuple), do: return_tuple
     end
   end
 
