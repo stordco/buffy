@@ -297,7 +297,7 @@ defmodule Buffy.ThrottleAndTimed do
       @impl GenServer
       @spec handle_continue(do_work :: atom(), Buffy.ThrottleAndTimed.state()) ::
               {:noreply, Buffy.ThrottleAndTimed.state()} | {:noreply, Buffy.ThrottleAndTimed.state(), timeout()}
-      def handle_continue(:timeout, %{key: key, args: args} = state) do
+      def handle_continue(:do_work, %{key: key, args: args} = state) do
         :telemetry.span(
           [:buffy, :throttle, :handle],
           %{args: args, key: key, module: __MODULE__},
