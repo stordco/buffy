@@ -160,6 +160,7 @@ defmodule Buffy.ThrottleAndTimed do
     supervisor_module = Keyword.get(opts, :supervisor_module, DynamicSupervisor)
     supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
     throttle = Keyword.fetch!(opts, :throttle)
+    loop_interval = Keyword.get(opts, :loop_interval)
 
     quote do
       @behaviour Buffy.Throttle
