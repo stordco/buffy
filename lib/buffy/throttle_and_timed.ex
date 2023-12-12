@@ -10,6 +10,7 @@ defmodule Buffy.ThrottleAndTimed do
   Here're what is different:
     - it will not be terminated once the timer is done, but kept alive
       - internally, the existing timer behavior is done via state rather than handling `{:error, {:already_started, pid}}` output of `GenServer.start_link`.
+        - See note on Horde about state.
     - it will be given the option (set by config) to trigger work repeatedly based on a empty inbox timeout interval,
       that is based on [GenServer's timeout feature](https://hexdocs.pm/elixir/1.12/GenServer.html#module-timeouts).
 
@@ -49,6 +50,12 @@ defmodule Buffy.ThrottleAndTimed do
     P --> |set message inbox timeout| S
 
   ```
+
+  ### Note on Horde based usage
+
+  Under Horde, the state unfortunately doesn't get synced up automatically - that requires explicit tooling.
+  Therefore state will be "reset" to the initial state when process boots up. This is not a big issue as the initial state is to
+  set a throttled run of `handle_throttle`.
 
   ## Example Usage
 
