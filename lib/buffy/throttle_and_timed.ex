@@ -130,6 +130,8 @@ defmodule Buffy.ThrottleAndTimed do
   - `:result` - The return value of the `handle_throttle/1` function.
 
   """
+  require Logger
+  alias Buffy.ThrottleAndTimed
 
   @typedoc """
   A list of arbitrary arguments that are used for the `c:handle_throttle/1`
@@ -171,14 +173,14 @@ defmodule Buffy.ThrottleAndTimed do
     loop_interval = Keyword.get(opts, :loop_interval)
 
     quote do
-      @behaviour Buffy.Throttle
+      @behaviour Buffy.ThrottleAndTimed
 
       use GenServer, restart: unquote(restart)
 
       require Logger
 
       @doc false
-      @spec start_link(Buffy.ThrottleAndTimed.state()) :: {:ok, pid} | {:error, term()}
+      @spec start_link({ThrottleAndTimed.key(), ThrottleAndTimed.args()}) :: :ignore | {:ok, pid} | {:error, term()}
       def start_link({key, args}) do
         name = key_to_name(key)
 
@@ -293,9 +295,9 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc false
       @impl GenServer
-      @spec handle_continue(:do_work, Buffy.ThrottleAndTimed.state()) ::
+      @spec handle_continue(do_work :: atom(), Buffy.ThrottleAndTimed.state()) ::
               {:noreply, Buffy.ThrottleAndTimed.state()} | {:noreply, Buffy.ThrottleAndTimed.state(), timeout()}
-      def handle_info(:timeout, %{key: key, args: args} = state) do
+      def handle_continue(:timeout, %{key: key, args: args} = state) do
         :telemetry.span(
           [:buffy, :throttle, :handle],
           %{args: args, key: key, module: __MODULE__},
@@ -319,26 +321,30 @@ defmodule Buffy.ThrottleAndTimed do
            ) do
         loop_interval = unquote(loop_interval)
 
-        case {work_status, loop_interval} do
-          {:complete, loop_interval} when is_number(loop_interval) ->
-            {return_signal, %{state | work_status: :scheduled}, loop_interval}
-
-          {_, nil} ->
-            return_tuple
-
-          {_, loop_interval} when not is_number(loop_interval) ->
-            Logger.error(
-              "Error parsing :loop_interval - value is not a number, will ignore. Got: #{inspect(loop_interval)}"
-            )
-
-            return_tuple
-
-          _ ->
-            return_tuple
-        end
+        ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(loop_interval, return_tuple)
       end
 
       defp maybe_add_inbox_timeout_and_update_work_status(return_tuple), do: return_tuple
     end
+  end
+
+  def maybe_add_inbox_timeout_and_update_work_status(nil, return_tuple), do: return_tuple
+
+  def maybe_add_inbox_timeout_and_update_work_status(
+        loop_interval,
+        {return_signal, %{work_status: work_status} = state} = return_tuple
+      )
+      when is_number(loop_interval) do
+    if work_status == :complete do
+      {return_signal, %{state | work_status: :scheduled}, loop_interval}
+    else
+      return_tuple
+    end
+  end
+
+  def maybe_add_inbox_timeout_and_update_work_status(loop_interval, return_tuple) do
+    Logger.error("Error parsing :loop_interval - value is not a number, will ignore. Got: #{inspect(loop_interval)}")
+
+    return_tuple
   end
 end
