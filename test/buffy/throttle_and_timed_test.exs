@@ -54,9 +54,9 @@ defmodule Buffy.ThrottleAndTimedTest do
       DynamicSupervisor.count_children(MyDynamicSupervisor)
       test_pid = self()
       MyTimedThrottler.throttle(%{test_pid: test_pid, prev: prev})
-      assert_receive {:ok, %{prev: ^prev}, now}, 200
 
       # Initial throttle is 10 msec so should receive within 20 msec
+      assert_receive {:ok, %{prev: ^prev}, now}, 200
       assert System.convert_time_unit(now - prev, :native, :millisecond) < 20
 
       # Inbox timeout triggers at 100 msec so should receive "around" that time
