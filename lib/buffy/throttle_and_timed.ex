@@ -269,6 +269,29 @@ defmodule Buffy.ThrottleAndTimed do
           Logger.error("Error in throttle: #{inspect(e)}")
           {:stop, :normal, {key, args}}
       end
+
+      defp maybe_add_inbox_timeout({first, second} = return_tuple) do
+        case loop_interval do
+          nil -> return_tuple
+        end
+
+        cond do
+          is_nil(loop_interval) ->
+            return_tuple
+
+          is_number(loop_interval) ->
+            {first, second, loop_interval}
+
+          true ->
+            Logger.error(
+              "Error parsing :loop_interval - value is not a number, will ignore. Got: #{inspect(loop_interval)}"
+            )
+
+            return_tuple
+        end
+      end
+
+      defp maybe_add_inbox_timeout(return_tuple), do: return_tuple
     end
   end
 end
