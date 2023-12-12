@@ -51,7 +51,7 @@ defmodule Buffy.ThrottleAndTimedTest do
 
     test "should trigger if no message in inbox for loop_interval" do
       prev = System.monotonic_time()
-      DynamicSupervisor.count_children(MyDynamicSupervisor) |> IO.inspect()
+      DynamicSupervisor.count_children(MyDynamicSupervisor)
       test_pid = self()
       MyTimedThrottler.throttle(%{test_pid: test_pid, now: System.monotonic_time()})
       assert_receive {:ok, %{now: ^prev}, now}, 200
