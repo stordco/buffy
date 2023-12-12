@@ -317,6 +317,8 @@ defmodule Buffy.ThrottleAndTimed do
       defp maybe_add_inbox_timeout_and_update_work_status(
              {return_signal, %{work_status: work_status} = state} = return_tuple
            ) do
+        loop_interval = unquote(loop_interval)
+
         case {work_status, loop_interval} do
           {:complete, loop_interval} when is_number(loop_interval) ->
             {return_signal, %{state | work_status: :scheduled}, loop_interval}
