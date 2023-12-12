@@ -6,18 +6,15 @@ defmodule Buffy.ThrottleAndTimedTest do
   setup do
     spy(UsingThrottleAndTimedZeroThrottler)
     spy(UsingThrottleAndTimedSlowThrottler)
-    spy(MyTimedThrottler)
     :ok
   end
 
   describe "handle_info(:timeout)" do
-    defp get_test_pid, do: self()
-
     defmodule MyDynamicSupervisor do
       use DynamicSupervisor
 
       def start_link(init_arg) do
-        Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
+        DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
       end
 
       @impl DynamicSupervisor
@@ -41,15 +38,24 @@ defmodule Buffy.ThrottleAndTimedTest do
         :error
       end
 
-      def handle_throttle(args) do
-        send(get_test_pid(), {:ok, args})
+      def handle_throttle(%{test_pid: test_pid} = args) do
+        send(test_pid, {:ok, args, System.monotonic_time()})
         :ok
       end
     end
 
     setup do
-      start_supervised(MyDynamicSupervisor)
-      [args: args]
+      start_supervised!({MyDynamicSupervisor, []})
+      :ok
+    end
+
+    test "should trigger if no message in inbox for loop_interval" do
+      prev = System.monotonic_time()
+      DynamicSupervisor.count_children(MyDynamicSupervisor) |> IO.inspect()
+      test_pid = self()
+      MyTimedThrottler.throttle(%{test_pid: test_pid, now: System.monotonic_time()})
+      assert_receive {:ok, %{now: ^prev}, now}, 200
+      assert now == 4000
     end
   end
 
