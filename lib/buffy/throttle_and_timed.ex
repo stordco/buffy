@@ -1,3 +1,4 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
 defmodule Buffy.ThrottleAndTimed do
   @moduledoc """
   This is a variation on the `Buffy.Throttle` behavior.
@@ -145,7 +146,7 @@ defmodule Buffy.ThrottleAndTimed do
   @typedoc """
   Internal state that `Buffy.Throttle` keeps.
   """
-  @type state :: {key(), args()}
+  @type state :: %{key: key(), args: args(), work_status: :in_progress | :scheduled | :complete}
 
   @doc """
   A function to call the throttle. This will start
@@ -177,7 +178,7 @@ defmodule Buffy.ThrottleAndTimed do
       require Logger
 
       @doc false
-      @spec start_link(Buffy.Throttle.state()) :: {:ok, pid} | {:error, term()}
+      @spec start_link(Buffy.ThrottleAndTimed.state()) :: {:ok, pid} | {:error, term()}
       def start_link({key, args}) do
         name = {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
 
@@ -197,7 +198,7 @@ defmodule Buffy.ThrottleAndTimed do
           {:ok, #PID<0.123.0>}
 
       """
-      @impl Buffy.Throttle
+      @impl Buffy.ThrottleAndTimed
       @spec throttle(Buffy.Throttle.args()) :: :ok | {:error, term()}
       def throttle(args) do
         key = args |> :erlang.term_to_binary() |> :erlang.phash2()
@@ -240,7 +241,7 @@ defmodule Buffy.ThrottleAndTimed do
           end
 
       """
-      @impl Buffy.Throttle
+      @impl Buffy.ThrottleAndTimed
       @spec handle_throttle(Buffy.Throttle.args()) :: any()
       def handle_throttle(_args) do
         raise RuntimeError,
@@ -251,16 +252,40 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc false
       @impl GenServer
-      @spec init(Buffy.Throttle.state()) :: {:ok, Buffy.Throttle.state()}
+      @spec init(Buffy.ThrottleAndTimed.state()) :: {:ok, Buffy.ThrottleAndTimed.state()}
       def init({key, args}) do
         Process.send_after(self(), :timeout, unquote(throttle))
-        {:ok, {key, args}}
+        {:ok, %{key: key, args: args, work_status: :scheduled}}
       end
 
       @doc false
       @impl GenServer
-      @spec handle_info(:timeout, Buffy.Throttle.state()) :: {:stop, :normal, Buffy.Throttle.state()}
-      def handle_info(:timeout, {key, args}) do
+      @spec handle_cast(:throttle | :trigger_work, Buffy.ThrottleAndTimed.state()) ::
+              {:noreply, Buffy.ThrottleAndTimed.state()}
+              | {:noreply, Buffy.ThrottleAndTimed.state(), {:continue, :trigger_work}}
+      def handle_cast(:throttle, %{work_status: :complete} = state) do
+        Process.send_after(self(), :timeout, unquote(throttle))
+        {:noreply, %{state | work_status: :scheduled}}
+      end
+
+      def handle_cast(:throttle, %{work_status: _} = state) do
+        {:noreply, state}
+      end
+
+      @doc false
+      @impl GenServer
+      @spec handle_info(:timeout, Buffy.ThrottleAndTimed.state()) ::
+              {:noreply, Buffy.ThrottleAndTimed.state(), {:continue, :do_work}}
+      def handle_info(:timeout, %{key: key, args: args} = state) do
+        new_state = %{state | work_status: :in_progress}
+        {:noreply, new_state, {:continue, :do_work}}
+      end
+
+      @doc false
+      @impl GenServer
+      @spec handle_continue(:do_work, Buffy.ThrottleAndTimed.state()) ::
+              {:noreply, Buffy.ThrottleAndTimed.state()} | {:noreply, Buffy.ThrottleAndTimed.state(), timeout()}
+      def handle_info(:timeout, %{key: key, args: args} = state) do
         :telemetry.span(
           [:buffy, :throttle, :handle],
           %{args: args, key: key, module: __MODULE__},
@@ -270,35 +295,38 @@ defmodule Buffy.ThrottleAndTimed do
           end
         )
 
-        {:stop, :normal, {key, args}}
+        new_state = %{state | work_status: :complete}
+        maybe_add_inbox_timeout_and_update_work_status({:noreply, new_state})
       rescue
         e ->
           Logger.error("Error in throttle: #{inspect(e)}")
-          {:stop, :normal, {key, args}}
+          new_state = %{state | work_status: :complete}
+          maybe_add_inbox_timeout_and_update_work_status({:noreply, new_state})
       end
 
-      defp maybe_add_inbox_timeout({first, second} = return_tuple) do
-        case loop_interval do
-          nil -> return_tuple
-        end
+      defp maybe_add_inbox_timeout_and_update_work_status(
+             {return_signal, %{work_status: work_status} = state} = return_tuple
+           ) do
+        case {work_status, loop_interval} do
+          {:complete, loop_interval} when is_number(loop_interval) ->
+            {return_signal, %{state | work_status: :scheduled}, loop_interval}
 
-        cond do
-          is_nil(loop_interval) ->
+          {_, nil} ->
             return_tuple
 
-          is_number(loop_interval) ->
-            {first, second, loop_interval}
-
-          true ->
+          {_, loop_interval} when not is_number(loop_interval) ->
             Logger.error(
               "Error parsing :loop_interval - value is not a number, will ignore. Got: #{inspect(loop_interval)}"
             )
 
             return_tuple
+
+          _ ->
+            return_tuple
         end
       end
 
-      defp maybe_add_inbox_timeout(return_tuple), do: return_tuple
+      defp maybe_add_inbox_timeout_and_update_work_status(return_tuple), do: return_tuple
     end
   end
 end
