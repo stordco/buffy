@@ -201,7 +201,7 @@ defmodule Buffy.ThrottleAndTimed do
       @impl Buffy.ThrottleAndTimed
       @spec throttle(Buffy.Throttle.args()) :: :ok | {:error, term()}
       def throttle(args) do
-        key = args |> :erlang.term_to_binary() |> :erlang.phash2()
+        key = args_to_key(args)
 
         :telemetry.execute(
           [:buffy, :throttle, :throttle],
@@ -210,10 +210,23 @@ defmodule Buffy.ThrottleAndTimed do
         )
 
         case unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, {key, args}}) do
-          {:ok, pid} -> :ok
-          :ignore -> :ok
-          result -> result
+          {:ok, pid} ->
+            :ok
+
+          :ignore ->
+            # already started; Trigger throttle for that process
+            args |> args_to_name |> GenServer.cast(:throttle)
+
+          result ->
+            result
         end
+      end
+
+      defp args_to_key(args), do: args |> :erlang.term_to_binary() |> :erlang.phash2()
+
+      defp args_to_name(args) do
+        key = args_to_key(args)
+        {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
       end
 
       @doc """
@@ -260,9 +273,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc false
       @impl GenServer
-      @spec handle_cast(:throttle | :trigger_work, Buffy.ThrottleAndTimed.state()) ::
-              {:noreply, Buffy.ThrottleAndTimed.state()}
-              | {:noreply, Buffy.ThrottleAndTimed.state(), {:continue, :trigger_work}}
+      @spec handle_cast(:throttle, Buffy.ThrottleAndTimed.state()) :: {:noreply, Buffy.ThrottleAndTimed.state()}
       def handle_cast(:throttle, %{work_status: :complete} = state) do
         Process.send_after(self(), :timeout, unquote(throttle))
         {:noreply, %{state | work_status: :scheduled}}
