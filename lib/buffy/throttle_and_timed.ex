@@ -180,7 +180,7 @@ defmodule Buffy.ThrottleAndTimed do
       @doc false
       @spec start_link(Buffy.ThrottleAndTimed.state()) :: {:ok, pid} | {:error, term()}
       def start_link({key, args}) do
-        name = {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
+        name = key_to_name(key)
 
         with {:error, {:already_started, pid}} <- GenServer.start_link(__MODULE__, {key, args}, name: name) do
           :ignore
@@ -215,7 +215,7 @@ defmodule Buffy.ThrottleAndTimed do
 
           :ignore ->
             # already started; Trigger throttle for that process
-            args |> args_to_name |> GenServer.cast(:throttle)
+            key |> key_to_name |> GenServer.cast(:throttle)
 
           result ->
             result
@@ -224,8 +224,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       defp args_to_key(args), do: args |> :erlang.term_to_binary() |> :erlang.phash2()
 
-      defp args_to_name(args) do
-        key = args_to_key(args)
+      defp key_to_name(key) do
         {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
       end
 
