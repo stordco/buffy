@@ -3,6 +3,7 @@ defmodule Buffy.ThrottleAndTimedTest do
   use ExUnitProperties
 
   import ExUnit.CaptureLog
+  alias Buffy.ThrottleAndTimed
 
   defmodule MyDynamicSupervisor do
     use DynamicSupervisor
@@ -245,6 +246,38 @@ defmodule Buffy.ThrottleAndTimedTest do
                                  module: MyZeroThrottler
                                }}
              end)
+    end
+  end
+
+  describe "maybe_add_inbox_timeout_and_update_work_status/2" do
+    test "should return interval if loop_interval given as number and work_status is complete" do
+      old_state = %{work_status: :complete}
+
+      assert {:noreply, %{work_status: :scheduled_by_loop_interval}, 4} =
+               ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(4, {:noreply, old_state})
+    end
+
+    test "should return given state if loop_interval is nil" do
+      old_state = %{work_status: :complete}
+
+      assert {:noreply, ^old_state} =
+               ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(nil, {:noreply, old_state})
+    end
+
+    test "should return given state if work_status isn't :complete" do
+      old_state = %{work_status: :in_progress}
+
+      assert {:noreply, ^old_state} =
+               ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(4, {:noreply, old_state})
+    end
+
+    test "should log and return given state if loop_interval isn't a number" do
+      old_state = %{work_status: :complete}
+
+      assert capture_log(fn ->
+               assert {:noreply, ^old_state} =
+                        ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status("4", {:noreply, old_state})
+             end) =~ "Error parsing :loop_interval"
     end
   end
 end
