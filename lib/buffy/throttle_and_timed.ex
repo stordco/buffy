@@ -69,7 +69,6 @@ defmodule Buffy.ThrottleAndTimed do
     ...
     children = [
       ...
-      # Start timed interval run of WarehouseEvents.FulfillableStatusCheckBuffer for all valid shippers
       {true,
        Task.child_spec(fn ->
          for x <- 1..10, do: MyModuleUsingThrottleAndTimed.throttle(some: "value", x: x)
