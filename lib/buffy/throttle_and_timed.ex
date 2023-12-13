@@ -49,6 +49,7 @@ defmodule Buffy.ThrottleAndTimed do
     S --> |empty inbox timeout interval| P(Do immediate work)
     W --> |set message inbox timeout| S
     P --> |set message inbox timeout| S
+  ```
 
   ### Note on Horde based usage
 
@@ -60,7 +61,22 @@ defmodule Buffy.ThrottleAndTimed do
 
   This will not run when your application starts. The suggested approach is to create a child spec for the application Supervisor (typically in `application.ex`)
   for a Task module, that runs how many instances of `throttle/1` as necessary. That way, the default inbox timeout will run,
-  using `loop_interval`
+  using `loop_interval`, as some variation of:
+
+  ```
+  # application.ex
+  def start(_type, _args) do
+    ...
+    children = [
+      ...
+      # Start timed interval run of WarehouseEvents.FulfillableStatusCheckBuffer for all valid shippers
+      {true,
+       Task.child_spec(fn ->
+         for x <- 1..10, do: MyModuleUsingThrottleAndTimed.throttle(some: "value", x: x)
+       end)}
+    ]
+    ...
+  ```
 
   ## Example Usage
 
