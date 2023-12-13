@@ -70,9 +70,14 @@ defmodule Buffy.ThrottleAndTimed do
     children = [
       ...
       {true,
-       Task.child_spec(fn ->
-         for x <- 1..10, do: MyModuleUsingThrottleAndTimed.throttle(some: "value", x: x)
-       end)}
+       Supervisor.child_spec(
+         {Task,
+          fn ->
+            for x <- 1..10, do: MyModuleUsingThrottleAndTimed.throttle(some: "value", x: x)
+          end},
+         id: MyModuleUsingThrottleAndTimedInit,
+         restart: :temporary
+       )}
     ]
     ...
   ```
