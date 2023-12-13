@@ -57,7 +57,7 @@ defmodule Buffy.ThrottleAndTimed do
   Therefore state will be "reset" to the initial state when process boots up. This is not a big issue as the initial state is to
   set a throttled run of `handle_throttle`.
 
-  ### Recommended use in order to have this run in timed interval when your application boots up
+  ### How to start timed interval triggers when your application boots up
 
   This will not run when your application starts. The suggested approach is to create a child spec for the application Supervisor (typically in `application.ex`)
   for a Task module, that runs how many instances of `throttle/1` as necessary. That way, the default inbox timeout will run,
