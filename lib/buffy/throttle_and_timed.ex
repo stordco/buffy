@@ -4,11 +4,11 @@ defmodule Buffy.ThrottleAndTimed do
   This is a variation on the `Buffy.Throttle` behavior.
 
   It keeps the following functionality:
-    - Wait for a specified amount of time before
+    - wait for a specified amount of time before
   invoking the work function. If the function is called again before the time has
   elapsed, it's a no-op.
 
-  Here're what is different:
+  Key difference between `Buffy.Throttle` and `Buffy.ThrottleAndTimed`:
     - it will not be terminated once the timer is done, but kept alive
       - internally, the existing timer behavior is done via state rather than handling `{:error, {:already_started, pid}}` output of `GenServer.start_link`.
         - See note on Horde about state.
