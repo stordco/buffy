@@ -50,8 +50,6 @@ defmodule Buffy.ThrottleAndTimed do
     W --> |set message inbox timeout| S
     P --> |set message inbox timeout| S
 
-  ```
-
   ### Note on Horde based usage
 
   Under Horde, the state unfortunately doesn't get synced up automatically - that requires explicit tooling.
