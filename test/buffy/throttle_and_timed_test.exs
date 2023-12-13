@@ -44,6 +44,27 @@ defmodule Buffy.ThrottleAndTimedTest do
       end
     end
 
+    defmodule MyTimedSlowThrottler do
+      use Buffy.ThrottleAndTimed,
+        throttle: 100,
+        loop_interval: 300,
+        supervisor_module: DynamicSupervisor,
+        supervisor_name: MyDynamicSupervisor
+
+      def handle_throttle(:raise) do
+        raise RuntimeError, message: ":raise"
+      end
+
+      def handle_throttle(:error) do
+        :error
+      end
+
+      def handle_throttle(%{test_pid: test_pid} = args) do
+        send(test_pid, {:ok, args, System.monotonic_time()})
+        :ok
+      end
+    end
+
     setup do
       start_supervised!({MyDynamicSupervisor, []})
       :ok
@@ -69,13 +90,38 @@ defmodule Buffy.ThrottleAndTimedTest do
       diff = System.convert_time_unit(now3 - now2, :native, :millisecond)
       assert :erlang.abs(diff - 100) < 10
     end
+
+    test "should throttle all incoming triggers when work is already scheduled" do
+      DynamicSupervisor.count_children(MyDynamicSupervisor)
+      test_pid = self()
+      # trigger throttle
+      MyTimedSlowThrottler.throttle(%{test_pid: test_pid})
+
+      # trigger more throttle
+      for _ <- 1..10 do
+        Task.async(fn ->
+          MyTimedSlowThrottler.throttle(%{test_pid: test_pid})
+        end)
+      end
+
+      # assert throttled work done
+      assert_receive {:ok, _, now}, 200
+
+      # refute any other work was done
+      refute_receive {:ok, _, _now}, 200
+
+      # check inbox timeout triggered
+      assert_receive {:ok, _, now2}, 400
+      diff = System.convert_time_unit(now2 - now, :native, :millisecond)
+      assert :erlang.abs(diff - 300) < 10
+    end
   end
 
   # Extend timeout for the number of CI runs + the Process.sleep call.
   # Because MyZeroDebouncer.debounce/1 is async, we need to sleep to ensure
   # the logic is ran.
   @tag timeout: :timer.minutes(10)
-  test "calls handle_debounce/1" do
+  test "calls handle_throttle/1" do
     check all args <- StreamData.term() do
       assert :ok = UsingThrottleAndTimedZeroThrottler.throttle(args)
       Process.sleep(1)
@@ -83,7 +129,7 @@ defmodule Buffy.ThrottleAndTimedTest do
     end
   end
 
-  test "throttles handle_debounce/1" do
+  test "throttles handle_throttle/1" do
     for _ <- 1..200, do: UsingThrottleAndTimedSlowThrottler.throttle(:testing)
     Process.sleep(100)
     assert_called_once UsingThrottleAndTimedSlowThrottler.handle_throttle(:testing)
