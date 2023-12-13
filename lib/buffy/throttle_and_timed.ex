@@ -148,7 +148,11 @@ defmodule Buffy.ThrottleAndTimed do
   @typedoc """
   Internal state that `Buffy.Throttle` keeps.
   """
-  @type state :: %{key: key(), args: args(), work_status: :in_progress | :scheduled | :complete}
+  @type state :: %{
+          key: key(),
+          args: args(),
+          work_status: :in_progress | :scheduled_by_loop_interval | :scheduled | :complete
+        }
 
   @doc """
   A function to call the throttle. This will start
@@ -272,10 +276,21 @@ defmodule Buffy.ThrottleAndTimed do
         {:ok, %{key: key, args: args, work_status: :scheduled}}
       end
 
-      @doc false
+      @doc """
+      Function to invoke the throttle logic if process already exists.
+      It will invoke the throttle logic if `:work_status` in state is either `:complete` or `:scheduled_by_loop_interval`.
+      `:scheduled_by_loop_interval` is set by the empty inbox timeout, which should be overruled with any incoming message -
+      since the timeout is reset by the definition of empty inbox timeout, the throttle logic can safely be scheduled.
+
+      """
       @impl GenServer
       @spec handle_cast(:throttle, Buffy.ThrottleAndTimed.state()) :: {:noreply, Buffy.ThrottleAndTimed.state()}
       def handle_cast(:throttle, %{work_status: :complete} = state) do
+        Process.send_after(self(), :timeout, unquote(throttle))
+        {:noreply, %{state | work_status: :scheduled}}
+      end
+
+      def handle_cast(:throttle, %{work_status: :scheduled_by_loop_interval} = state) do
         Process.send_after(self(), :timeout, unquote(throttle))
         {:noreply, %{state | work_status: :scheduled}}
       end
@@ -334,7 +349,7 @@ defmodule Buffy.ThrottleAndTimed do
       )
       when is_number(loop_interval) do
     if work_status == :complete do
-      {return_signal, %{state | work_status: :scheduled}, loop_interval}
+      {return_signal, %{state | work_status: :scheduled_by_loop_interval}, loop_interval}
     else
       return_tuple
     end

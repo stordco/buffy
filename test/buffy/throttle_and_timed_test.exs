@@ -115,6 +115,25 @@ defmodule Buffy.ThrottleAndTimedTest do
       diff = System.convert_time_unit(now2 - now, :native, :millisecond)
       assert :erlang.abs(diff - 300) < 10
     end
+
+    test "should reset inbox timeout if throttle request comes in" do
+      DynamicSupervisor.count_children(MyDynamicSupervisor)
+      test_pid = self()
+      # trigger initial throttle
+      MyTimedSlowThrottler.throttle(%{test_pid: test_pid})
+
+      # assert throttled work done
+      assert_receive {:ok, _, now}, 200
+
+      # now in inbox timeout waiting period and work scheduled via inbox timeout logic
+      # trigger a throttle
+      MyTimedSlowThrottler.throttle(%{test_pid: test_pid})
+
+      # assert the trigger happend within the throttle interval and not the inbox timeout loop interval
+      assert_receive {:ok, _, now2}, 400
+      diff = System.convert_time_unit(now2 - now, :native, :millisecond)
+      assert :erlang.abs(diff - 100) < 10
+    end
   end
 
   # Extend timeout for the number of CI runs + the Process.sleep call.
