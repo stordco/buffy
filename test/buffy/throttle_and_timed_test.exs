@@ -177,6 +177,14 @@ defmodule Buffy.ThrottleAndTimedTest do
       test_pid = self()
       for _ <- 1..200, do: MySlowThrottler.throttle(%{test_pid: test_pid})
       assert_receive {:ok, _, _}, 200
+      refute_receive {:ok, _, _}, 200
+    end
+
+    test "should not trigger again without loop_interval" do
+      test_pid = self()
+      MySlowThrottler.throttle(%{test_pid: test_pid})
+      assert_receive {:ok, _, _}, 200
+      refute_receive {:ok, _, _}, 200
     end
   end
 
