@@ -66,14 +66,6 @@ defmodule Buffy.ThrottleAndTimedTest do
         supervisor_module: DynamicSupervisor,
         supervisor_name: MyDynamicSupervisor
 
-      def handle_throttle(:raise) do
-        raise RuntimeError, message: ":raise"
-      end
-
-      def handle_throttle(:error) do
-        :error
-      end
-
       def handle_throttle(%{test_pid: test_pid} = args) do
         send(test_pid, {:ok, args, System.monotonic_time()})
         :ok
@@ -86,14 +78,6 @@ defmodule Buffy.ThrottleAndTimedTest do
         loop_interval: 300,
         supervisor_module: DynamicSupervisor,
         supervisor_name: MyDynamicSupervisor
-
-      def handle_throttle(:raise) do
-        raise RuntimeError, message: ":raise"
-      end
-
-      def handle_throttle(:error) do
-        :error
-      end
 
       def handle_throttle(%{test_pid: test_pid} = args) do
         send(test_pid, {:ok, args, System.monotonic_time()})
