@@ -3,7 +3,6 @@ defmodule Buffy.ThrottleAndTimedTest do
   use ExUnitProperties
 
   import ExUnit.CaptureLog
-  alias Buffy.ThrottleAndTimed
 
   defmodule MyDynamicSupervisor do
     use DynamicSupervisor
@@ -22,7 +21,8 @@ defmodule Buffy.ThrottleAndTimedTest do
     use Buffy.ThrottleAndTimed,
       throttle: 100,
       supervisor_module: DynamicSupervisor,
-      supervisor_name: MyDynamicSupervisor
+      supervisor_name: MyDynamicSupervisor,
+      loop_interval: 200
 
     def handle_throttle(:raise) do
       raise RuntimeError, message: ":raise"
@@ -42,7 +42,8 @@ defmodule Buffy.ThrottleAndTimedTest do
     use Buffy.Throttle,
       throttle: 0,
       supervisor_module: DynamicSupervisor,
-      supervisor_name: MyDynamicSupervisor
+      supervisor_name: MyDynamicSupervisor,
+      loop_interval: 100
 
     def handle_throttle(:raise) do
       raise RuntimeError, message: ":raise"
@@ -137,7 +138,6 @@ defmodule Buffy.ThrottleAndTimedTest do
     end
 
     test "should reset inbox timeout if throttle request comes in" do
-      DynamicSupervisor.count_children(MyDynamicSupervisor)
       test_pid = self()
       # trigger initial throttle
       MyTimedSlowThrottler.throttle(%{test_pid: test_pid})
@@ -172,13 +172,6 @@ defmodule Buffy.ThrottleAndTimedTest do
     test "throttles handle_throttle/1" do
       test_pid = self()
       for _ <- 1..200, do: MySlowThrottler.throttle(%{test_pid: test_pid})
-      assert_receive {:ok, _, _}, 200
-      refute_receive {:ok, _, _}, 200
-    end
-
-    test "should not trigger again without loop_interval" do
-      test_pid = self()
-      MySlowThrottler.throttle(%{test_pid: test_pid})
       assert_receive {:ok, _, _}, 200
       refute_receive {:ok, _, _}, 200
     end
@@ -234,38 +227,6 @@ defmodule Buffy.ThrottleAndTimedTest do
                                  module: MyZeroThrottler
                                }}
              end)
-    end
-  end
-
-  describe "maybe_add_inbox_timeout_and_update_work_status/2" do
-    test "should return interval if loop_interval given as number and work_status is complete" do
-      old_state = %{work_status: :complete}
-
-      assert {:noreply, %{work_status: :scheduled_by_loop_interval}, 4} =
-               ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(4, {:noreply, old_state})
-    end
-
-    test "should return given state if loop_interval is nil" do
-      old_state = %{work_status: :complete}
-
-      assert {:noreply, ^old_state} =
-               ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(nil, {:noreply, old_state})
-    end
-
-    test "should return given state if work_status isn't :complete" do
-      old_state = %{work_status: :in_progress}
-
-      assert {:noreply, ^old_state} =
-               ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(4, {:noreply, old_state})
-    end
-
-    test "should log and return given state if loop_interval isn't a number" do
-      old_state = %{work_status: :complete}
-
-      assert capture_log(fn ->
-               assert {:noreply, ^old_state} =
-                        ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status("4", {:noreply, old_state})
-             end) =~ "Error parsing :loop_interval"
     end
   end
 end

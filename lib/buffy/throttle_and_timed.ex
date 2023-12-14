@@ -176,7 +176,7 @@ defmodule Buffy.ThrottleAndTimed do
   @type state :: %{
           key: key(),
           args: args(),
-          work_status: :in_progress | :scheduled_by_loop_interval | :scheduled | :complete
+          timer_ref: reference()
         }
 
   @doc """
@@ -199,7 +199,7 @@ defmodule Buffy.ThrottleAndTimed do
     supervisor_module = Keyword.get(opts, :supervisor_module, DynamicSupervisor)
     supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
     throttle = Keyword.fetch!(opts, :throttle)
-    loop_interval = Keyword.get(opts, :loop_interval)
+    loop_interval = Keyword.fetch!(opts, :loop_interval)
 
     quote do
       @behaviour Buffy.ThrottleAndTimed
@@ -297,40 +297,39 @@ defmodule Buffy.ThrottleAndTimed do
       @impl GenServer
       @spec init({ThrottleAndTimed.key(), ThrottleAndTimed.args()}) :: {:ok, Buffy.ThrottleAndTimed.state()}
       def init({key, args}) do
-        Process.send_after(self(), :timeout, unquote(throttle))
-        {:ok, %{key: key, args: args, work_status: :scheduled}}
+        {:ok, schedule_throttle_and_update_state(%{key: key, args: args, timer_ref: nil})}
       end
 
       @doc """
       Function to invoke the throttle logic if process already exists.
-      It will invoke the throttle logic if `:work_status` in state is either `:complete` or `:scheduled_by_loop_interval`.
-      `:scheduled_by_loop_interval` is set by the empty inbox timeout, which should be overruled with any incoming message -
-      since the timeout is reset by the definition of empty inbox timeout, the throttle logic can safely be scheduled.
+      It will only schedule a throttle if `timer_ref` is `nil`.
 
       """
       @impl GenServer
       @spec handle_cast(:throttle, Buffy.ThrottleAndTimed.state()) :: {:noreply, Buffy.ThrottleAndTimed.state()}
-      def handle_cast(:throttle, %{work_status: :complete} = state) do
-        Process.send_after(self(), :timeout, unquote(throttle))
-        {:noreply, %{state | work_status: :scheduled}}
+      def handle_cast(:throttle, %{timer_ref: nil} = state) do
+        {:noreply, schedule_throttle_and_update_state(state)}
       end
 
-      def handle_cast(:throttle, %{work_status: :scheduled_by_loop_interval} = state) do
-        Process.send_after(self(), :timeout, unquote(throttle))
-        {:noreply, %{state | work_status: :scheduled}}
-      end
-
-      def handle_cast(:throttle, %{work_status: _} = state) do
+      def handle_cast(:throttle, state) do
         {:noreply, state}
+      end
+
+      defp schedule_throttle_and_update_state(state) do
+        timer_ref = Process.send_after(self(), :execute_throttle_callback, unquote(throttle))
+        %{state | timer_ref: timer_ref}
       end
 
       @doc false
       @impl GenServer
-      @spec handle_info(:timeout, Buffy.ThrottleAndTimed.state()) ::
+      @spec handle_info(:timeout | :execute_throttle_callback, Buffy.ThrottleAndTimed.state()) ::
               {:noreply, Buffy.ThrottleAndTimed.state(), {:continue, :do_work}}
-      def handle_info(:timeout, %{key: key, args: args} = state) do
-        new_state = %{state | work_status: :in_progress}
-        {:noreply, new_state, {:continue, :do_work}}
+      def handle_info(:timeout, state) do
+        {:noreply, state, {:continue, :do_work}}
+      end
+
+      def handle_info(:execute_throttle_callback, state) do
+        {:noreply, state, {:continue, :do_work}}
       end
 
       @doc false
@@ -347,42 +346,28 @@ defmodule Buffy.ThrottleAndTimed do
           end
         )
 
-        new_state = %{state | work_status: :complete}
-        maybe_add_inbox_timeout_and_update_work_status({:noreply, new_state})
+        new_state = %{state | timer_ref: nil}
+        maybe_add_inbox_timeout({:noreply, new_state})
       rescue
         e ->
           Logger.error("Error in throttle: #{inspect(e)}")
-          new_state = %{state | work_status: :complete}
-          maybe_add_inbox_timeout_and_update_work_status({:noreply, new_state})
+          new_state = %{state | timer_ref: nil}
+          maybe_add_inbox_timeout({:noreply, new_state})
       end
 
-      defp maybe_add_inbox_timeout_and_update_work_status(
-             {return_signal, %{work_status: work_status} = state} = return_tuple
-           ) do
+      defp maybe_add_inbox_timeout({return_signal, state} = return_tuple) do
         loop_interval = unquote(loop_interval)
 
-        ThrottleAndTimed.maybe_add_inbox_timeout_and_update_work_status(loop_interval, return_tuple)
+        if is_number(loop_interval) do
+          {return_signal, state, loop_interval}
+        else
+          Logger.error(
+            "Error parsing :loop_interval - value is not a number, will ignore. Got: #{inspect(loop_interval)}"
+          )
+
+          return_tuple
+        end
       end
     end
-  end
-
-  def maybe_add_inbox_timeout_and_update_work_status(nil, return_tuple), do: return_tuple
-
-  def maybe_add_inbox_timeout_and_update_work_status(
-        loop_interval,
-        {return_signal, %{work_status: work_status} = state} = return_tuple
-      )
-      when is_number(loop_interval) do
-    if work_status == :complete do
-      {return_signal, %{state | work_status: :scheduled_by_loop_interval}, loop_interval}
-    else
-      return_tuple
-    end
-  end
-
-  def maybe_add_inbox_timeout_and_update_work_status(loop_interval, return_tuple) do
-    Logger.error("Error parsing :loop_interval - value is not a number, will ignore. Got: #{inspect(loop_interval)}")
-
-    return_tuple
   end
 end
