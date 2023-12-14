@@ -218,7 +218,7 @@ defmodule Buffy.ThrottleAndTimed do
       end
 
       @doc """
-      Starts debouncing the given `t:Buffy.Throttle.key()` for the
+      Starts debouncing the given `t:Buffy.ThrottleAndTimed.key()` for the
       module set `throttle` time. Returns a tuple containing `:ok`
       and the `t:pid()` of the throttle process.
 
