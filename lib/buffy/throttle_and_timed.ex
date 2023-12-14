@@ -230,7 +230,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       """
       @impl Buffy.ThrottleAndTimed
-      @spec throttle(Buffy.Throttle.args()) :: :ok | {:error, term()}
+      @spec throttle(Buffy.ThrottleAndTimed.args()) :: :ok | {:error, term()}
       def throttle(args) do
         key = args_to_key(args)
 
