@@ -267,7 +267,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       ## Examples
 
-      A simple example of implementing the `c:Buffy.Throttle.handle_throttle/1`
+      A simple example of implementing the `c:Buffy.ThrottleAndTimed.handle_throttle/1`
       callback:
 
           def handle_throttle(args) do
