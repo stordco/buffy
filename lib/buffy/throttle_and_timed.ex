@@ -142,6 +142,7 @@ defmodule Buffy.ThrottleAndTimed do
   These are the events that are called by the `Buffy.ThrottleAndTimed` module:
 
   - `[:buffy, :throttle, :throttle]` - Emitted when the `throttle/1` function is called.
+  - `[:buffy, :throttle, :timeout]` - Emitted when work is triggered via inbox timeout.
   - `[:buffy, :throttle, :handle, :start]` - Emitted at the start of the `handle_throttle/1` function.
   - `[:buffy, :throttle, :handle, :stop]` - Emitted at the end of the `handle_throttle/1` function.
   - `[:buffy, :throttle, :handle, :exception]` - Emitted when an error is raised in the `handle_throttle/1` function.
@@ -326,7 +327,13 @@ defmodule Buffy.ThrottleAndTimed do
       @impl GenServer
       @spec handle_info(:timeout | :execute_throttle_callback, Buffy.ThrottleAndTimed.state()) ::
               {:noreply, Buffy.ThrottleAndTimed.state(), {:continue, :do_work}}
-      def handle_info(:timeout, state) do
+      def handle_info(:timeout, %{key: key, args: args} = state) do
+        :telemetry.execute(
+          [:buffy, :throttle, :timeout],
+          %{count: 1},
+          %{args: args, key: key, module: __MODULE__}
+        )
+
         {:noreply, state, {:continue, :do_work}}
       end
 
