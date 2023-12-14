@@ -274,7 +274,7 @@ defmodule Buffy.ThrottleAndTimed do
             # Do some work
           end
 
-      Handling errors in the `c:Buffy.Throttle.handle_throttle/1` callback:
+      Handling errors in the `c:Buffy.ThrottleAndTimed.handle_throttle/1` callback:
 
           def handle_throttle(args) do
             # Do some work
