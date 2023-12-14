@@ -285,7 +285,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       """
       @impl Buffy.ThrottleAndTimed
-      @spec handle_throttle(Buffy.Throttle.args()) :: any()
+      @spec handle_throttle(Buffy.ThrottleAndTimed.args()) :: any()
       def handle_throttle(_args) do
         raise RuntimeError,
           message: "You must implement the `handle_throttle/1` function in your module."
