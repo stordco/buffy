@@ -171,7 +171,7 @@ defmodule Buffy.ThrottleAndTimed do
   @type key :: term()
 
   @typedoc """
-  Internal state that `Buffy.Throttle` keeps.
+  Internal state that `Buffy.ThrottleAndTimed` keeps.
   """
   @type state :: %{
           key: key(),
