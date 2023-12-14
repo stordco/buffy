@@ -116,7 +116,7 @@ defmodule Buffy.ThrottleAndTimed do
 
     - :throttle (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
 
-    - `:loop_interval` (`atom`) - Optional. The amount of time that this process will wait while inbox is empty until sending a `:timeout` message (handle via `handle_info`). Resets if message comes in. In milliseconds.
+    - `:loop_interval` (`atom`) - Required. The amount of time that this process will wait while inbox is empty until sending a `:timeout` message (handle via `handle_info`). Resets if message comes in. In milliseconds.
 
   ## Using with Horde
 
