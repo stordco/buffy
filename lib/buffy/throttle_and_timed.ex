@@ -261,7 +261,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc """
       The function that runs after throttle has completed. This function will
-      be called with the `t:Buffy.Throttle.key()` and can return anything. The
+      be called with the `t:Buffy.ThrottleAndTimed.key()` and can return anything. The
       return value is ignored. If an error is raised, it will be logged and
       ignored.
 
