@@ -59,8 +59,10 @@ defmodule Buffy.ThrottleAndTimed do
 
   ### How to start timed interval triggers when your application boots up
 
-  This will not run when your application starts. The suggested approach is to create a child spec for the application Supervisor (typically in `application.ex`)
-  for a Task module, that runs how many instances of `throttle/1` as necessary. That way, the default inbox timeout will run,
+  By design this will not run when your application starts. If there's a need to start the inbox timeout,
+  then create a child spec for the application Supervisor (typically in `application.ex`)
+  for a Task module, that runs how many instances of `throttle/1` as necessary.
+  That way, the default inbox timeout will run,
   using `loop_interval`, as some variation of:
 
   ```
