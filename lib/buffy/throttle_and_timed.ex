@@ -13,7 +13,7 @@ defmodule Buffy.ThrottleAndTimed do
       - internally, the existing timer behavior is done via state rather than handling `{:error, {:already_started, pid}}` output of `GenServer.start_link`.
         - See note on Horde about state.
     - it requires `:loop_interval` field value (set by config) to trigger work repeatedly based on a empty inbox timeout interval,
-      that is based on [GenServer's timeout feature](https://hexdocs.pm/elixir/1.12/GenServer.html#module-timeouts).
+      that is based on [GenServer's timeout feature](https://hexdocs.pm/elixir/1.15/GenServer.html#module-timeouts).
 
   Main reason for these changes is sometimes there's a need to fall back to a time-interval triggered work, when there aren't any triggers to
   start the work. Requirement of this means the process should exist and not get terminated immediately after a successfully throttled work execution.
