@@ -203,6 +203,11 @@ defmodule Buffy.ThrottleAndTimed do
     throttle = Keyword.fetch!(opts, :throttle)
     loop_interval = Keyword.fetch!(opts, :loop_interval)
 
+    unless is_number(loop_interval) do
+      # credo:disable-for-next-line Credo.Check.Readability.NestedFunctionCalls
+      raise ArgumentError, ":loop_interval is not a number: #{inspect(loop_interval)}"
+    end
+
     quote do
       @behaviour Buffy.ThrottleAndTimed
 
@@ -355,26 +360,12 @@ defmodule Buffy.ThrottleAndTimed do
         )
 
         new_state = %{state | timer_ref: nil}
-        maybe_add_inbox_timeout({:noreply, new_state})
+        {:noreply, new_state, unquote(loop_interval)}
       rescue
         e ->
           Logger.error("Error in throttle: #{inspect(e)}")
           new_state = %{state | timer_ref: nil}
-          maybe_add_inbox_timeout({:noreply, new_state})
-      end
-
-      defp maybe_add_inbox_timeout({return_signal, state} = return_tuple) do
-        loop_interval = unquote(loop_interval)
-
-        if is_number(loop_interval) do
-          {return_signal, state, loop_interval}
-        else
-          Logger.error(
-            "Error parsing :loop_interval - value is not a number, will ignore. Got: #{inspect(loop_interval)}"
-          )
-
-          return_tuple
-        end
+          {:noreply, new_state, unquote(loop_interval)}
       end
     end
   end
