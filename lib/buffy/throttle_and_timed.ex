@@ -205,7 +205,7 @@ defmodule Buffy.ThrottleAndTimed do
 
     unless is_number(loop_interval) do
       # credo:disable-for-next-line Credo.Check.Readability.NestedFunctionCalls
-      raise ArgumentError, ":loop_interval is not a number: #{inspect(loop_interval)}"
+      raise ArgumentError, "expected :loop_interval to be a number, received: #{inspect(loop_interval)}"
     end
 
     quote do
