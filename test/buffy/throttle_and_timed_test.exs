@@ -39,7 +39,7 @@ defmodule Buffy.ThrottleAndTimedTest do
   end
 
   defmodule MyZeroThrottler do
-    use Buffy.Throttle,
+    use Buffy.ThrottleAndTimed,
       throttle: 0,
       supervisor_module: DynamicSupervisor,
       supervisor_name: MyDynamicSupervisor,
@@ -201,6 +201,7 @@ defmodule Buffy.ThrottleAndTimedTest do
       _ref =
         :telemetry_test.attach_event_handlers(self(), [
           [:buffy, :throttle, :throttle],
+          [:buffy, :throttle, :timeout],
           [:buffy, :throttle, :handle, :start],
           [:buffy, :throttle, :handle, :stop],
           [:buffy, :throttle, :handle, :exception]
@@ -220,6 +221,19 @@ defmodule Buffy.ThrottleAndTimedTest do
                         key: _,
                         module: MyZeroThrottler
                       }}
+    end
+
+    test "emits [:buffy, :throttle, :timeout]" do
+      args = %{test_pid: self()}
+      MyZeroThrottler.throttle(args)
+
+      assert_receive {[:buffy, :throttle, :timeout], _ref, %{count: 1},
+                      %{
+                        args: ^args,
+                        key: _,
+                        module: MyZeroThrottler
+                      }},
+                     150
     end
 
     test "emits [:buffy, :throttle, :handle, :start]" do
