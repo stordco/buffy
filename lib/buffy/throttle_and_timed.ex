@@ -51,7 +51,7 @@ defmodule Buffy.ThrottleAndTimed do
     P --> |set message inbox timeout| S
   ```
 
-  ### Note on Horde based usage
+  ### Note on usage with Horde
 
   Under Horde, the state unfortunately doesn't get synced up automatically - that requires explicit tooling.
   Therefore state will be "reset" to the initial state when process boots up. This is not a big issue as the initial state is to
