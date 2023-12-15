@@ -198,14 +198,13 @@ defmodule Buffy.ThrottleAndTimedTest do
 
   describe ":telemetry" do
     setup do
-      _ref =
-        :telemetry_test.attach_event_handlers(self(), [
-          [:buffy, :throttle, :throttle],
-          [:buffy, :throttle, :timeout],
-          [:buffy, :throttle, :handle, :start],
-          [:buffy, :throttle, :handle, :stop],
-          [:buffy, :throttle, :handle, :exception]
-        ])
+      :telemetry_test.attach_event_handlers(self(), [
+        [:buffy, :throttle, :throttle],
+        [:buffy, :throttle, :timeout],
+        [:buffy, :throttle, :handle, :start],
+        [:buffy, :throttle, :handle, :stop],
+        [:buffy, :throttle, :handle, :exception]
+      ])
 
       start_supervised!({MyDynamicSupervisor, []})
 
