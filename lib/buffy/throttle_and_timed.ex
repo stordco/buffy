@@ -204,6 +204,13 @@ defmodule Buffy.ThrottleAndTimed do
     loop_interval = Keyword.fetch!(opts, :loop_interval)
 
     quote do
+      unless is_number(unquote(loop_interval)) do
+        # credo:disable-for-next-line Credo.Check.Readability.NestedFunctionCalls
+        raise ArgumentError, "expected :loop_interval to be a number, received: #{inspect(unquote(loop_interval))}"
+      end
+    end
+
+    quote do
       @behaviour ThrottleAndTimed
 
       use GenServer, restart: unquote(restart)
@@ -299,11 +306,6 @@ defmodule Buffy.ThrottleAndTimed do
       @impl GenServer
       @spec init({ThrottleAndTimed.key(), ThrottleAndTimed.args()}) :: {:ok, ThrottleAndTimed.state()}
       def init({key, args}) do
-        unless is_number(unquote(loop_interval)) do
-          # credo:disable-for-next-line Credo.Check.Readability.NestedFunctionCalls
-          raise ArgumentError, "expected :loop_interval to be a number, received: #{inspect(unquote(loop_interval))}"
-        end
-
         {:ok, schedule_throttle_and_update_state(%{key: key, args: args, timer_ref: nil})}
       end
 
