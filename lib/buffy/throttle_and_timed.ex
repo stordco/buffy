@@ -203,11 +203,6 @@ defmodule Buffy.ThrottleAndTimed do
     throttle = Keyword.fetch!(opts, :throttle)
     loop_interval = Keyword.fetch!(opts, :loop_interval)
 
-    unless is_number(loop_interval) do
-      # credo:disable-for-next-line Credo.Check.Readability.NestedFunctionCalls
-      raise ArgumentError, "expected :loop_interval to be a number, received: #{inspect(loop_interval)}"
-    end
-
     quote do
       @behaviour ThrottleAndTimed
 
