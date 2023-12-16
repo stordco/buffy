@@ -176,9 +176,9 @@ defmodule Buffy.ThrottleAndTimed do
   Internal state that `Buffy.ThrottleAndTimed` keeps.
   """
   @type state :: %{
-          key: key(),
           args: args(),
-          timer_ref: reference()
+          key: key(),
+          timer_ref: nil | reference()
         }
 
   @doc """
@@ -202,11 +202,6 @@ defmodule Buffy.ThrottleAndTimed do
     supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
     throttle = Keyword.fetch!(opts, :throttle)
     loop_interval = Keyword.fetch!(opts, :loop_interval)
-
-    unless is_number(loop_interval) do
-      # credo:disable-for-next-line Credo.Check.Readability.NestedFunctionCalls
-      raise ArgumentError, "expected :loop_interval to be a number, received: #{inspect(loop_interval)}"
-    end
 
     quote do
       @behaviour ThrottleAndTimed
@@ -304,6 +299,11 @@ defmodule Buffy.ThrottleAndTimed do
       @impl GenServer
       @spec init({ThrottleAndTimed.key(), ThrottleAndTimed.args()}) :: {:ok, ThrottleAndTimed.state()}
       def init({key, args}) do
+        unless is_number(unquote(loop_interval)) do
+          # credo:disable-for-next-line Credo.Check.Readability.NestedFunctionCalls
+          raise ArgumentError, "expected :loop_interval to be a number, received: #{inspect(unquote(loop_interval))}"
+        end
+
         {:ok, schedule_throttle_and_update_state(%{key: key, args: args, timer_ref: nil})}
       end
 
@@ -348,7 +348,12 @@ defmodule Buffy.ThrottleAndTimed do
       @doc false
       @impl GenServer
       @spec handle_continue(do_work :: atom(), ThrottleAndTimed.state()) ::
-              {:noreply, ThrottleAndTimed.state()} | {:noreply, ThrottleAndTimed.state(), timeout()}
+              {:noreply,
+               %{
+                 args: ThrottleAndTimed.args(),
+                 key: ThrottleAndTimed.key(),
+                 timer_ref: nil | reference()
+               }, timeout()}
       def handle_continue(:do_work, %{key: key, args: args} = state) do
         :telemetry.span(
           [:buffy, :throttle, :handle],
