@@ -65,3 +65,4 @@ tags
 # End of https://www.toptal.com/developers/gitignore/api/elixir,phoenix,vim,macosx
 
 .vscode
+.DS_Store
