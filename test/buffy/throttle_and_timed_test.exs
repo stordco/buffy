@@ -112,7 +112,6 @@ defmodule Buffy.ThrottleAndTimedTest do
 
     test "should trigger if no message in inbox for loop_interval" do
       prev = System.monotonic_time()
-      DynamicSupervisor.count_children(MyDynamicSupervisor)
       test_pid = self()
       MyTimedThrottler.throttle(%{test_pid: test_pid, prev: prev})
 
@@ -132,7 +131,6 @@ defmodule Buffy.ThrottleAndTimedTest do
     end
 
     test "should throttle all incoming triggers when work is already scheduled" do
-      DynamicSupervisor.count_children(MyDynamicSupervisor)
       test_pid = self()
       # trigger throttle
       MyTimedSlowThrottler.throttle(%{test_pid: test_pid})
