@@ -158,7 +158,6 @@ defmodule Buffy.ThrottleAndTimed do
 
   """
   require Logger
-  alias Buffy.ThrottleAndTimed
 
   @typedoc """
   A list of arbitrary arguments that are used for the `c:handle_throttle/1`
@@ -176,9 +175,9 @@ defmodule Buffy.ThrottleAndTimed do
   Internal state that `Buffy.ThrottleAndTimed` keeps.
   """
   @type state :: %{
-          key: key(),
           args: args(),
-          timer_ref: reference()
+          key: key(),
+          timer_ref: nil | reference()
         }
 
   @doc """
@@ -203,20 +202,16 @@ defmodule Buffy.ThrottleAndTimed do
     throttle = Keyword.fetch!(opts, :throttle)
     loop_interval = Keyword.fetch!(opts, :loop_interval)
 
-    unless is_number(loop_interval) do
-      # credo:disable-for-next-line Credo.Check.Readability.NestedFunctionCalls
-      raise ArgumentError, "expected :loop_interval to be a number, received: #{inspect(loop_interval)}"
-    end
-
     quote do
-      @behaviour ThrottleAndTimed
+      @behaviour Buffy.ThrottleAndTimed
 
       use GenServer, restart: unquote(restart)
 
       require Logger
 
       @doc false
-      @spec start_link({ThrottleAndTimed.key(), ThrottleAndTimed.args()}) :: :ignore | {:ok, pid} | {:error, term()}
+      @spec start_link({Buffy.ThrottleAndTimed.key(), Buffy.ThrottleAndTimed.args()}) ::
+              :ignore | {:ok, pid} | {:error, term()}
       def start_link({key, args}) do
         name = key_to_name(key)
 
@@ -236,8 +231,8 @@ defmodule Buffy.ThrottleAndTimed do
           {:ok, #PID<0.123.0>}
 
       """
-      @impl ThrottleAndTimed
-      @spec throttle(ThrottleAndTimed.args()) :: :ok | {:error, term()}
+      @impl Buffy.ThrottleAndTimed
+      @spec throttle(Buffy.ThrottleAndTimed.args()) :: :ok | {:error, term()}
       def throttle(args) do
         key = args_to_key(args)
 
@@ -291,8 +286,8 @@ defmodule Buffy.ThrottleAndTimed do
           end
 
       """
-      @impl ThrottleAndTimed
-      @spec handle_throttle(ThrottleAndTimed.args()) :: any()
+      @impl Buffy.ThrottleAndTimed
+      @spec handle_throttle(Buffy.ThrottleAndTimed.args()) :: any()
       def handle_throttle(_args) do
         raise RuntimeError,
           message: "You must implement the `handle_throttle/1` function in your module."
@@ -302,7 +297,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc false
       @impl GenServer
-      @spec init({ThrottleAndTimed.key(), ThrottleAndTimed.args()}) :: {:ok, ThrottleAndTimed.state()}
+      @spec init({Buffy.ThrottleAndTimed.key(), Buffy.ThrottleAndTimed.args()}) :: {:ok, Buffy.ThrottleAndTimed.state()}
       def init({key, args}) do
         {:ok, schedule_throttle_and_update_state(%{key: key, args: args, timer_ref: nil})}
       end
@@ -313,7 +308,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       """
       @impl GenServer
-      @spec handle_cast(:throttle, ThrottleAndTimed.state()) :: {:noreply, ThrottleAndTimed.state()}
+      @spec handle_cast(:throttle, Buffy.ThrottleAndTimed.state()) :: {:noreply, Buffy.ThrottleAndTimed.state()}
       def handle_cast(:throttle, %{timer_ref: nil} = state) do
         {:noreply, schedule_throttle_and_update_state(state)}
       end
@@ -329,8 +324,8 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc false
       @impl GenServer
-      @spec handle_info(:timeout | :execute_throttle_callback, ThrottleAndTimed.state()) ::
-              {:noreply, ThrottleAndTimed.state(), {:continue, :do_work}}
+      @spec handle_info(:timeout | :execute_throttle_callback, Buffy.ThrottleAndTimed.state()) ::
+              {:noreply, Buffy.ThrottleAndTimed.state(), {:continue, :do_work}}
       def handle_info(:timeout, %{key: key, args: args} = state) do
         :telemetry.execute(
           [:buffy, :throttle, :timeout],
@@ -347,8 +342,8 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc false
       @impl GenServer
-      @spec handle_continue(do_work :: atom(), ThrottleAndTimed.state()) ::
-              {:noreply, ThrottleAndTimed.state()} | {:noreply, ThrottleAndTimed.state(), timeout()}
+      @spec handle_continue(do_work :: atom(), Buffy.ThrottleAndTimed.state()) ::
+              {:noreply, Buffy.ThrottleAndTimed.state()} | {:noreply, Buffy.ThrottleAndTimed.state(), timeout()}
       def handle_continue(:do_work, %{key: key, args: args} = state) do
         :telemetry.span(
           [:buffy, :throttle, :handle],
