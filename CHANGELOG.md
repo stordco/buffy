@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/stordco/buffy/compare/v2.1.0...v2.1.1) (2023-12-18)
+
+
+### Bug Fixes
+
+* SIGNAL-5504 fix usage of option fields and typespec ([#32](https://github.com/stordco/buffy/issues/32)) ([fbb8fd2](https://github.com/stordco/buffy/commit/fbb8fd25b778846afd6e919100ca56b96b220aee))
+
 ## [2.1.0](https://github.com/stordco/buffy/compare/v2.0.1...v2.1.0) (2023-12-15)
 
 
