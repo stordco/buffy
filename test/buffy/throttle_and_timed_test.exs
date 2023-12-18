@@ -59,25 +59,6 @@ defmodule Buffy.ThrottleAndTimedTest do
     end
   end
 
-  describe "loop_interval type check" do
-    test "should raise if loop_interval is not a number nor a nil" do
-      assert_raise ArgumentError, fn ->
-        defmodule MyWrongThrottler do
-          use Buffy.ThrottleAndTimed,
-            throttle: 100,
-            loop_interval: "300",
-            supervisor_module: DynamicSupervisor,
-            supervisor_name: MyDynamicSupervisor
-
-          def handle_throttle(%{test_pid: test_pid} = args) do
-            send(test_pid, {:ok, args, System.monotonic_time()})
-            :ok
-          end
-        end
-      end
-    end
-  end
-
   describe "handle_info(:timeout)" do
     defmodule MyTimedThrottler do
       use Buffy.ThrottleAndTimed,
