@@ -16,7 +16,7 @@ Just add [`buffy`](https://hex.pm/packages/buffy) to your `mix.exs` file like so
 ```elixir
 def deps do
   [
-    {:buffy, "~> 2.0.1"}
+    {:buffy, "~> 2.0.2"}
   ]
 end
 ```
