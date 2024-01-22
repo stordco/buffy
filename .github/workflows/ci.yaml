@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - main
+      - code-freeze/**
   workflow_call:
     secrets:
       CI_SERVICE_KEY:
@@ -28,6 +29,7 @@ concurrency:
 
 jobs:
   Credo:
+    if: ${{ !startsWith(github.head_ref, 'release-please--branches') }}
     runs-on: ubuntu-latest
 
     steps:
@@ -46,6 +48,7 @@ jobs:
         run: mix credo --strict
 
   Dependencies:
+    if: ${{ !startsWith(github.head_ref, 'release-please--branches') }}
     runs-on: ubuntu-latest
 
     steps:
@@ -64,6 +67,7 @@ jobs:
         run: mix deps.unlock --check-unused
 
   Dialyzer:
+    if: ${{ !startsWith(github.head_ref, 'release-please--branches') }}
     runs-on: ubuntu-latest
 
     steps:
@@ -82,6 +86,7 @@ jobs:
         run: mix dialyzer --format github
 
   Documentation:
+    if: ${{ !startsWith(github.head_ref, 'release-please--branches') }}
     runs-on: ubuntu-latest
 
     steps:
@@ -100,6 +105,7 @@ jobs:
         run: mix docs
 
   Format:
+    if: ${{ !startsWith(github.head_ref, 'release-please--branches') }}
     runs-on: ubuntu-latest
 
     steps:
@@ -118,6 +124,7 @@ jobs:
         run: mix format --check-formatted
 
   Test:
+    if: ${{ !startsWith(github.head_ref, 'release-please--branches') }}
     name: Test (Elixir ${{ matrix.versions.elixir }} OTP ${{ matrix.versions.otp }})
 
     runs-on: ubuntu-latest
@@ -144,7 +151,7 @@ jobs:
         run: mix compile --warnings-as-errors
 
       - name: Test
-        run: mix coveralls.github --parallel
+        run: mix coveralls.github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
