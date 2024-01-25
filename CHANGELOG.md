@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.1.1](https://github.com/stordco/buffy/compare/v2.1.0...v2.1.1) (2023-12-18)
+
+
+### Bug Fixes
+
+* SIGNAL-5504 fix usage of option fields and typespec ([#32](https://github.com/stordco/buffy/issues/32)) ([fbb8fd2](https://github.com/stordco/buffy/commit/fbb8fd25b778846afd6e919100ca56b96b220aee))
+
+## [2.1.0](https://github.com/stordco/buffy/compare/v2.0.1...v2.1.0) (2023-12-15)
+
+
+### Features
+
+* Add jitter option to throttle function ([#26](https://github.com/stordco/buffy/issues/26)) ([7991f91](https://github.com/stordco/buffy/commit/7991f91dc09e34d1478a999d771b1be3fd5a88b9))
+
+
+### Bug Fixes
+
+* Debounce should be throttle ([#30](https://github.com/stordco/buffy/issues/30)) ([c0cd187](https://github.com/stordco/buffy/commit/c0cd187af50e3fc60c47464d2cf9ecc62e26f086))
+
+
+### Miscellaneous
+
+* Sync files with stordco/common-config-elixir ([#23](https://github.com/stordco/buffy/issues/23)) ([68bdd18](https://github.com/stordco/buffy/commit/68bdd18cacd7fef8007aa59def429c5b43f3c16a))
+
 ## [2.0.1](https://github.com/stordco/buffy/compare/v2.0.0...v2.0.1) (2023-10-03)
 
 
