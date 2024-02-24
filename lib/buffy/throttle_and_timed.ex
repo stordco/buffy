@@ -328,16 +328,6 @@ defmodule Buffy.ThrottleAndTimed do
         %{state | timer_ref: timer_ref}
       end
 
-      @doc """
-      Function that updates the state with incoming args.
-
-      """
-      def update_state_with_args(state, _args) do
-        state
-      end
-
-      defoverridable update_state_with_args: 2
-
       @doc false
       @impl GenServer
       @spec handle_info(:timeout | :execute_throttle_callback, Buffy.ThrottleAndTimed.state()) ::
