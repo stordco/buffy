@@ -315,30 +315,28 @@ defmodule Buffy.ThrottleAndTimed do
       @impl GenServer
       @spec handle_cast({:throttle, new_args :: any()}, Buffy.ThrottleAndTimed.state()) ::
               {:noreply, Buffy.ThrottleAndTimed.state()}
-      def handle_cast({:throttle, args}, %{timer_ref: nil} = state) do
-        {:noreply, schedule_throttle_and_update_state(state, new_args)}
+      def handle_cast({:throttle, new_args}, %{timer_ref: nil, args: args} = state) do
+        {:noreply, state |> schedule_throttle_and_update_state() |> Map.put(:args, update_args(args, new_args))}
       end
 
-      def handle_cast({:throttle, args}, state) do
-        {:noreply, state}
+      def handle_cast({:throttle, new_args}, %{args: args} = state) do
+        {:noreply, %{state | args: update_args(args, new_args)}}
       end
 
-      defp schedule_throttle_and_update_state(state, new_args \\ {}) do
+      defp schedule_throttle_and_update_state(state) do
         timer_ref = Process.send_after(self(), :execute_throttle_callback, unquote(throttle))
-        %{update_state_with_args(state, new_args) | timer_ref: timer_ref}
+        %{state | timer_ref: timer_ref}
       end
 
       @doc """
       Function that updates the state with incoming args.
 
-      If this function is overridden and the overrode function udpates :timer_ref value in the state, that value will not persist in state.
-      In other words, `:timer_ref` is a controlled state key and can't be changed.
       """
       def update_state_with_args(state, _args) do
         state
       end
 
-      defoverridable(:update_state_with_args, 2)
+      defoverridable update_state_with_args: 2
 
       @doc false
       @impl GenServer
@@ -363,17 +361,17 @@ defmodule Buffy.ThrottleAndTimed do
       @spec handle_continue(do_work :: atom(), Buffy.ThrottleAndTimed.state()) ::
               {:noreply, Buffy.ThrottleAndTimed.state()} | {:noreply, Buffy.ThrottleAndTimed.state(), timeout()}
       def handle_continue(:do_work, %{key: key, args: args} = state) do
-        result = handle_throttle(args, state)
+        result =
+          :telemetry.span(
+            [:buffy, :throttle, :handle],
+            %{args: args, key: key, module: __MODULE__},
+            fn ->
+              result = handle_throttle(args)
+              {result, %{args: args, key: key, module: __MODULE__, result: result}}
+            end
+          )
 
-        :telemetry.span(
-          [:buffy, :throttle, :handle],
-          %{args: args, key: key, module: __MODULE__},
-          fn ->
-            {result, %{args: args, key: key, module: __MODULE__, result: result}}
-          end
-        )
-
-        new_state = %{update_state_with_work_result(state) | timer_ref: nil}
+        new_state = %{update_state_with_work_result(state, result) | timer_ref: nil}
         {:noreply, new_state, unquote(loop_interval)}
       rescue
         e ->
@@ -383,9 +381,16 @@ defmodule Buffy.ThrottleAndTimed do
       end
 
       @doc """
+      Updates state using a function that takes in previous args
+      """
+      @spec update_args(prev_args :: any(), new_args :: any()) :: any()
+      def update_args(prev_args, _new_args), do: prev_args
+
+      defoverridable update_args: 2
+
+      @doc """
       Uses result and updates state.
-      If this function is overridden and the overrode function udpates :timer_ref value in the state, that value will not persist in state.
-      In other words, `:timer_ref` is a controlled state key and can't be changed.
+
       """
       @spec update_state_with_work_result(state :: %{timer_ref: reference() | nil}, result :: any()) :: %{
               timer_ref: reference() | nil
@@ -394,7 +399,7 @@ defmodule Buffy.ThrottleAndTimed do
         state
       end
 
-      defoverridable(:update_state_with_work_result, 2)
+      defoverridable update_state_with_work_result: 2
     end
   end
 end
