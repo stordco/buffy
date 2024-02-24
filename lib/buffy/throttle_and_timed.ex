@@ -248,16 +248,21 @@ defmodule Buffy.ThrottleAndTimed do
 
           :ignore ->
             # already started; Trigger throttle for that process
-            key |> key_to_name |> GenServer.cast(:throttle)
+            key |> key_to_name |> GenServer.cast({:throttle, args})
 
           result ->
             result
         end
       end
 
-      defp args_to_key(args), do: args |> :erlang.term_to_binary() |> :erlang.phash2()
+      @doc """
+      Function that returns a key from incoming args.
+      """
+      @spec args_to_key(any()) :: non_neg_integer()
+      def args_to_key(args), do: args |> :erlang.term_to_binary() |> :erlang.phash2()
+      defoverridable args_to_key: 1
 
-      defp key_to_name(key) do
+      def key_to_name(key) do
         {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
       end
 
@@ -308,19 +313,32 @@ defmodule Buffy.ThrottleAndTimed do
 
       """
       @impl GenServer
-      @spec handle_cast(:throttle, Buffy.ThrottleAndTimed.state()) :: {:noreply, Buffy.ThrottleAndTimed.state()}
-      def handle_cast(:throttle, %{timer_ref: nil} = state) do
-        {:noreply, schedule_throttle_and_update_state(state)}
+      @spec handle_cast({:throttle, new_args :: any()}, Buffy.ThrottleAndTimed.state()) ::
+              {:noreply, Buffy.ThrottleAndTimed.state()}
+      def handle_cast({:throttle, args}, %{timer_ref: nil} = state) do
+        {:noreply, schedule_throttle_and_update_state(state, new_args)}
       end
 
-      def handle_cast(:throttle, state) do
+      def handle_cast({:throttle, args}, state) do
         {:noreply, state}
       end
 
-      defp schedule_throttle_and_update_state(state) do
+      defp schedule_throttle_and_update_state(state, new_args \\ {}) do
         timer_ref = Process.send_after(self(), :execute_throttle_callback, unquote(throttle))
-        %{state | timer_ref: timer_ref}
+        %{update_state_with_args(state, new_args) | timer_ref: timer_ref}
       end
+
+      @doc """
+      Function that updates the state with incoming args.
+
+      If this function is overridden and the overrode function udpates :timer_ref value in the state, that value will not persist in state.
+      In other words, `:timer_ref` is a controlled state key and can't be changed.
+      """
+      def update_state_with_args(state, _args) do
+        state
+      end
+
+      defoverridable(:update_state_with_args, 2)
 
       @doc false
       @impl GenServer
@@ -345,16 +363,17 @@ defmodule Buffy.ThrottleAndTimed do
       @spec handle_continue(do_work :: atom(), Buffy.ThrottleAndTimed.state()) ::
               {:noreply, Buffy.ThrottleAndTimed.state()} | {:noreply, Buffy.ThrottleAndTimed.state(), timeout()}
       def handle_continue(:do_work, %{key: key, args: args} = state) do
+        result = handle_throttle(args, state)
+
         :telemetry.span(
           [:buffy, :throttle, :handle],
           %{args: args, key: key, module: __MODULE__},
           fn ->
-            result = handle_throttle(args)
             {result, %{args: args, key: key, module: __MODULE__, result: result}}
           end
         )
 
-        new_state = %{state | timer_ref: nil}
+        new_state = %{update_state_with_work_result(state) | timer_ref: nil}
         {:noreply, new_state, unquote(loop_interval)}
       rescue
         e ->
@@ -362,6 +381,20 @@ defmodule Buffy.ThrottleAndTimed do
           new_state = %{state | timer_ref: nil}
           {:noreply, new_state, unquote(loop_interval)}
       end
+
+      @doc """
+      Uses result and updates state.
+      If this function is overridden and the overrode function udpates :timer_ref value in the state, that value will not persist in state.
+      In other words, `:timer_ref` is a controlled state key and can't be changed.
+      """
+      @spec update_state_with_work_result(state :: %{timer_ref: reference() | nil}, result :: any()) :: %{
+              timer_ref: reference() | nil
+            }
+      def update_state_with_work_result(state, _result) do
+        state
+      end
+
+      defoverridable(:update_state_with_work_result, 2)
     end
   end
 end
