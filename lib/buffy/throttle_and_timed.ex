@@ -14,6 +14,7 @@ defmodule Buffy.ThrottleAndTimed do
         - See note on Horde about state.
     - it requires `:loop_interval` field value (set by config) to trigger work repeatedly based on a empty inbox timeout interval,
       that is based on [GenServer's timeout feature](https://hexdocs.pm/elixir/1.15/GenServer.html#module-timeouts).
+    - allows for manipulating state for each `throttle` via `defoveridable` functions (see [use case below](#module-example-usage-1))
 
   Main reason for these changes is sometimes there's a need to fall back to a time-interval triggered work, when there aren't any triggers to
   start the work. Requirement of this means the process should exist and not get terminated immediately after a successfully throttled work execution.
@@ -117,6 +118,35 @@ defmodule Buffy.ThrottleAndTimed do
     - :throttle (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
 
     - `:loop_interval` (`atom`) - Required. The amount of time that this process will wait while inbox is empty until sending a `:timeout` message (handle via `handle_info`). Resets if message comes in. In milliseconds.
+
+  ## Example Usage:
+  ### Have `throttle/1` add to data to state to process in `handle_throttle/1`
+  ```
+    defmodule MyTimedSlowBucketingThrottler do
+      use Buffy.ThrottleAndTimed,
+        throttle: 100,
+        loop_interval: 300,
+        supervisor_module: DynamicSupervisor,
+        supervisor_name: MyDynamicSupervisor
+
+      def handle_throttle(%{test_pid: test_pid, values: values} = args) do
+        send(test_pid, {:ok, args, System.monotonic_time()})
+        values
+      end
+
+      def args_to_key(%{key: key}), do: key |> :erlang.term_to_binary() |> :erlang.phash2()
+
+      def update_args(%{values: values} = old_arg, %{values: new_values} = _new_arg)
+          when is_list(values) and is_list(new_values) do
+        %{old_arg | values: Enum.sort(values ++ new_values)}
+      end
+
+      def update_state_with_work_result(%{args: %{values: state_values} = args} = state, result) do
+        pending_values = state_values |> MapSet.new() |> MapSet.difference(MapSet.new(result)) |> MapSet.to_list()
+        %{state | args: %{args | values: pending_values}}
+      end
+    end
+  ```
 
   ## Using with Horde
 
@@ -320,6 +350,7 @@ defmodule Buffy.ThrottleAndTimed do
       end
 
       def handle_cast({:throttle, new_args}, %{args: args} = state) do
+        IO.inspect(new_args, label: "throttle new args")
         {:noreply, %{state | args: update_args(args, new_args)}}
       end
 
@@ -362,6 +393,7 @@ defmodule Buffy.ThrottleAndTimed do
           )
 
         new_state = %{update_state_with_work_result(state, result) | timer_ref: nil}
+        IO.inspect("setting loop interval")
         {:noreply, new_state, unquote(loop_interval)}
       rescue
         e ->
