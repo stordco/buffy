@@ -182,13 +182,13 @@ defmodule Buffy.ThrottleAndTimedTest do
       """
       use Buffy.ThrottleAndTimed,
         throttle: 100,
-        loop_interval: 300,
         supervisor_module: DynamicSupervisor,
         supervisor_name: MyDynamicSupervisor
 
-      def handle_throttle(%{test_pid: test_pid, values: _values} = args) do
+      def handle_throttle(%{test_pid: test_pid, values: values} = args) do
+        Process.sleep(200)
         send(test_pid, {:ok, args, System.monotonic_time()})
-        :ok
+        values
       end
 
       def args_to_key(%{key: key}), do: key |> :erlang.term_to_binary() |> :erlang.phash2()
@@ -198,8 +198,14 @@ defmodule Buffy.ThrottleAndTimedTest do
         %{old_arg | values: Enum.sort(values ++ new_values)}
       end
 
-      def update_state_with_work_result(%{args: args} = state, _) do
-        %{state | args: %{args | values: []}}
+      def update_state_with_work_result(%{args: %{values: state_values} = args} = state, result) do
+        pending_values =
+          state_values
+          |> MapSet.new()
+          |> MapSet.difference(MapSet.new(result))
+          |> MapSet.to_list()
+
+        %{state | args: %{args | values: pending_values}}
       end
     end
 
@@ -212,24 +218,29 @@ defmodule Buffy.ThrottleAndTimedTest do
       test_pid = self()
       # trigger throttle
       MyTimedSlowBucketingThrottler.throttle(%{key: "my_key", test_pid: test_pid, values: [0]})
-
+      pause_in_middle = 150
       # trigger more throttle
       for x <- 1..10 do
         Task.async(fn ->
           MyTimedSlowBucketingThrottler.throttle(%{key: "my_key", test_pid: test_pid, values: [x]})
         end)
+
+        if x == 2 do
+          # wait to trigger handle_throttle() before next set of integers
+          Process.sleep(pause_in_middle)
+        end
       end
 
       # assert throttled work done
-      expected_value = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-      assert_receive {:ok, %{values: ^expected_value}, now}, 200
+      expected_value = [0, 1, 2]
+      assert_receive {:ok, %{values: ^expected_value}, handle_throttle_t1}, 350
 
-      # refute any other work was done
-      refute_receive {:ok, _, _now}, 200
+      # expect
+      expected_value = [3, 4, 5, 6, 7, 8, 9, 10]
+      assert_receive {:ok, %{values: ^expected_value}, handle_throttle_t2}, 350
 
       # check inbox timeout triggered
-      assert_receive {:ok, _, now2}, 400
-      diff = System.convert_time_unit(now2 - now, :native, :millisecond)
+      diff = System.convert_time_unit(handle_throttle_t2 - handle_throttle_t1, :native, :millisecond)
       assert :erlang.abs(diff - 300) < 10
     end
   end
