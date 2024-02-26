@@ -120,16 +120,17 @@ defmodule Buffy.ThrottleAndTimed do
     - `:loop_interval` (`atom`) - Optional. The amount of time that this process will wait while inbox is empty until sending a `:timeout` message (handle via `handle_info`). Resets if message comes in. In milliseconds. Without this, the module would function exactly like `Buffy.Throttle`.
 
   ## Example Usage:
+
   ### Have `throttle/1` add to data to state to process in `handle_throttle/1`
   ```
     defmodule MyTimedSlowBucketingThrottler do
       use Buffy.ThrottleAndTimed,
         throttle: 100,
-        loop_interval: 300,
         supervisor_module: DynamicSupervisor,
         supervisor_name: MyDynamicSupervisor
 
       def handle_throttle(%{test_pid: test_pid, values: values} = args) do
+        Process.sleep(200)
         send(test_pid, {:ok, args, System.monotonic_time()})
         values
       end
@@ -142,7 +143,12 @@ defmodule Buffy.ThrottleAndTimed do
       end
 
       def update_state_with_work_result(%{args: %{values: state_values} = args} = state, result) do
-        pending_values = state_values |> MapSet.new() |> MapSet.difference(MapSet.new(result)) |> MapSet.to_list()
+        pending_values =
+          state_values
+          |> MapSet.new()
+          |> MapSet.difference(MapSet.new(result))
+          |> MapSet.to_list()
+
         %{state | args: %{args | values: pending_values}}
       end
     end
@@ -287,6 +293,8 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc """
       Function that returns a key from incoming args.
+
+      Defaults to `args |> :erlang.term_to_binary() |> :erlang.phash2()`
       """
       @spec args_to_key(any()) :: non_neg_integer()
       def args_to_key(args), do: args |> :erlang.term_to_binary() |> :erlang.phash2()
@@ -411,7 +419,8 @@ defmodule Buffy.ThrottleAndTimed do
       end
 
       @doc """
-      Updates state using a function that takes in previous args
+      Updates state using a function that takes in previous args.
+      Defaults to setting the same existing args.
       """
       @spec update_args(prev_args :: any(), new_args :: any()) :: any()
       def update_args(prev_args, _new_args), do: prev_args
@@ -420,7 +429,7 @@ defmodule Buffy.ThrottleAndTimed do
 
       @doc """
       Uses result and updates state.
-
+      Defaults to returning the existing state.
       """
       @spec update_state_with_work_result(state :: %{timer_ref: reference() | nil}, result :: any()) :: %{
               timer_ref: reference() | nil
