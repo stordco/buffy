@@ -428,8 +428,9 @@ defmodule Buffy.ThrottleAndTimed do
       Uses result and updates state.
       Defaults to returning the existing state.
       """
-      @spec update_state_with_work_result(state :: %{timer_ref: reference() | nil}, result :: any()) :: %{
-              timer_ref: reference() | nil
+      @spec update_state_with_work_result(state :: %{:args => any(), any() => any()}, result :: any()) :: %{
+              :args => any(),
+              any() => any()
             }
       def update_state_with_work_result(state, _result) do
         state
