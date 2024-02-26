@@ -12,7 +12,7 @@ defmodule Buffy.ThrottleAndTimed do
     - it will not be terminated once the timer is done, but kept alive
       - internally, the existing timer behavior is done via state rather than handling `{:error, {:already_started, pid}}` output of `GenServer.start_link`.
         - See note on Horde about state.
-    - it requires `:loop_interval` field value (set by config) to trigger work repeatedly based on a empty inbox timeout interval,
+    - it has an optional `:loop_interval` field value (set by config) to trigger work repeatedly based on a empty inbox timeout interval,
       that is based on [GenServer's timeout feature](https://hexdocs.pm/elixir/1.15/GenServer.html#module-timeouts).
     - allows for manipulating state for each `throttle` via `defoveridable` functions (see [use case below](#module-example-usage-1))
 
@@ -105,6 +105,8 @@ defmodule Buffy.ThrottleAndTimed do
 
   ## Options
 
+    - :throttle (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
+
     - `:registry_module` (`atom`) - Optional. A module that implements the `Registry` behaviour. If you are running in a distributed instance, you can set this value to `Horde.Registry`. Defaults to `Registry`.
 
     - `:registry_name` (`atom`) - Optional. The name of the registry to use. Defaults to the built in Buffy registry, but if you are running in a distributed instance you can set this value to a named `Horde.Registry` process. Defaults to `Buffy.Registry`.
@@ -115,9 +117,7 @@ defmodule Buffy.ThrottleAndTimed do
 
     - `:supervisor_name` (`atom`) - Optional. The name of the dynamic supervisor to use. Defaults to the built in Buffy dynamic supervisor, but if you are running in a distributed instance you can set this value to a named `Horde.DynamicSupervisor` process. Defaults to `Buffy.DynamicSupervisor`.
 
-    - :throttle (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
-
-    - `:loop_interval` (`atom`) - Required. The amount of time that this process will wait while inbox is empty until sending a `:timeout` message (handle via `handle_info`). Resets if message comes in. In milliseconds.
+    - `:loop_interval` (`atom`) - Optional. The amount of time that this process will wait while inbox is empty until sending a `:timeout` message (handle via `handle_info`). Resets if message comes in. In milliseconds. Without this, the module would function exactly like `Buffy.Throttle`.
 
   ## Example Usage:
   ### Have `throttle/1` add to data to state to process in `handle_throttle/1`
@@ -230,7 +230,7 @@ defmodule Buffy.ThrottleAndTimed do
     supervisor_module = Keyword.get(opts, :supervisor_module, DynamicSupervisor)
     supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
     throttle = Keyword.fetch!(opts, :throttle)
-    loop_interval = Keyword.fetch!(opts, :loop_interval)
+    loop_interval = Keyword.get(opts, :loop_interval)
 
     quote do
       @behaviour Buffy.ThrottleAndTimed
@@ -292,7 +292,7 @@ defmodule Buffy.ThrottleAndTimed do
       def args_to_key(args), do: args |> :erlang.term_to_binary() |> :erlang.phash2()
       defoverridable args_to_key: 1
 
-      def key_to_name(key) do
+      defp key_to_name(key) do
         {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
       end
 
@@ -350,7 +350,6 @@ defmodule Buffy.ThrottleAndTimed do
       end
 
       def handle_cast({:throttle, new_args}, %{args: args} = state) do
-        IO.inspect(new_args, label: "throttle new args")
         {:noreply, %{state | args: update_args(args, new_args)}}
       end
 
@@ -393,13 +392,22 @@ defmodule Buffy.ThrottleAndTimed do
           )
 
         new_state = %{update_state_with_work_result(state, result) | timer_ref: nil}
-        IO.inspect("setting loop interval")
-        {:noreply, new_state, unquote(loop_interval)}
+
+        if unquote(loop_interval) do
+          {:noreply, new_state, unquote(loop_interval)}
+        else
+          {:noreply, new_state}
+        end
       rescue
         e ->
           Logger.error("Error in throttle: #{inspect(e)}")
           new_state = %{state | timer_ref: nil}
-          {:noreply, new_state, unquote(loop_interval)}
+
+          if unquote(loop_interval) do
+            {:noreply, new_state, unquote(loop_interval)}
+          else
+            {:noreply, new_state}
+          end
       end
 
       @doc """
