@@ -143,13 +143,10 @@ defmodule Buffy.ThrottleAndTimed do
       end
 
       def update_state_with_work_result(%{args: %{values: state_values} = args} = state, result) do
-        pending_values =
-          state_values
-          |> MapSet.new()
-          |> MapSet.difference(MapSet.new(result))
-          |> MapSet.to_list()
-
-        %{state | args: %{args | values: pending_values}}
+        # because `handle_throttle()` runs in the `:continue` lifecycle of GenServer,
+        # inbox processing is paused until the logic completes. Inbox will continually get new messages,
+        # from calling `throttle()` and will be processed only after completion of `handle_throttle()`.
+        %{state | args: %{args | values: []}}
       end
     end
   ```
