@@ -231,17 +231,17 @@ defmodule Buffy.ThrottleAndTimedTest do
         end
       end
 
-      # assert throttled work done
       expected_value = [0, 1, 2]
       assert_receive {:ok, %{values: ^expected_value}, handle_throttle_t1}, 350
 
-      # expect
       expected_value = [3, 4, 5, 6, 7, 8, 9, 10]
       assert_receive {:ok, %{values: ^expected_value}, handle_throttle_t2}, 350
 
-      # check inbox timeout triggered
       diff = System.convert_time_unit(handle_throttle_t2 - handle_throttle_t1, :native, :millisecond)
       assert :erlang.abs(diff - 300) < 10
+
+      # refute no time interval fired as :loop_interval is not set
+      refute_receive {:ok, _, _}, 400
     end
   end
 
