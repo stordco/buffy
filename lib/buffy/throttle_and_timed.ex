@@ -233,7 +233,7 @@ defmodule Buffy.ThrottleAndTimed do
     supervisor_module = Keyword.get(opts, :supervisor_module, DynamicSupervisor)
     supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
     throttle = Keyword.fetch!(opts, :throttle)
-    loop_interval = Keyword.get(opts, :loop_interval)
+    loop_interval = Keyword.get(opts, :loop_interval, :infinity)
 
     quote do
       @behaviour Buffy.ThrottleAndTimed
@@ -398,21 +398,13 @@ defmodule Buffy.ThrottleAndTimed do
 
         new_state = %{update_state_with_work_result(state, result) | timer_ref: nil}
 
-        if unquote(loop_interval) do
-          {:noreply, new_state, unquote(loop_interval)}
-        else
-          {:noreply, new_state}
-        end
+        {:noreply, new_state, unquote(loop_interval)}
       rescue
         e ->
           Logger.error("Error in throttle: #{inspect(e)}")
           new_state = %{state | timer_ref: nil}
 
-          if unquote(loop_interval) do
-            {:noreply, new_state, unquote(loop_interval)}
-          else
-            {:noreply, new_state}
-          end
+          {:noreply, new_state, unquote(loop_interval)}
       end
 
       @doc """
