@@ -12,8 +12,9 @@ defmodule Buffy.ThrottleAndTimed do
     - it will not be terminated once the timer is done, but kept alive
       - internally, the existing timer behavior is done via state rather than handling `{:error, {:already_started, pid}}` output of `GenServer.start_link`.
         - See note on Horde about state.
-    - it requires `:loop_interval` field value (set by config) to trigger work repeatedly based on a empty inbox timeout interval,
+    - it has an optional `:loop_interval` field value (set by config) to trigger work repeatedly based on a empty inbox timeout interval,
       that is based on [GenServer's timeout feature](https://hexdocs.pm/elixir/1.15/GenServer.html#module-timeouts).
+    - allows for manipulating state for each `throttle` via `defoveridable` functions (see [use case below](#module-example-usage-1))
 
   Main reason for these changes is sometimes there's a need to fall back to a time-interval triggered work, when there aren't any triggers to
   start the work. Requirement of this means the process should exist and not get terminated immediately after a successfully throttled work execution.
@@ -104,6 +105,8 @@ defmodule Buffy.ThrottleAndTimed do
 
   ## Options
 
+    - :throttle (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
+
     - `:registry_module` (`atom`) - Optional. A module that implements the `Registry` behaviour. If you are running in a distributed instance, you can set this value to `Horde.Registry`. Defaults to `Registry`.
 
     - `:registry_name` (`atom`) - Optional. The name of the registry to use. Defaults to the built in Buffy registry, but if you are running in a distributed instance you can set this value to a named `Horde.Registry` process. Defaults to `Buffy.Registry`.
@@ -114,9 +117,39 @@ defmodule Buffy.ThrottleAndTimed do
 
     - `:supervisor_name` (`atom`) - Optional. The name of the dynamic supervisor to use. Defaults to the built in Buffy dynamic supervisor, but if you are running in a distributed instance you can set this value to a named `Horde.DynamicSupervisor` process. Defaults to `Buffy.DynamicSupervisor`.
 
-    - :throttle (`non_neg_integer`) - Required. The amount of time to wait before invoking the function. This value is in milliseconds.
+    - `:loop_interval` (`atom`) - Optional. The amount of time that this process will wait while inbox is empty until sending a `:timeout` message (handle via `handle_info`). Resets if message comes in. In milliseconds. Without this, the module would function exactly like `Buffy.Throttle`.
 
-    - `:loop_interval` (`atom`) - Required. The amount of time that this process will wait while inbox is empty until sending a `:timeout` message (handle via `handle_info`). Resets if message comes in. In milliseconds.
+  ## Example Usage:
+
+  ### Have `throttle/1` add to data to state to process in `handle_throttle/1`
+  ```
+    defmodule MyTimedSlowBucketingThrottler do
+      use Buffy.ThrottleAndTimed,
+        throttle: 100,
+        supervisor_module: DynamicSupervisor,
+        supervisor_name: MyDynamicSupervisor
+
+      def handle_throttle(%{test_pid: test_pid, values: values} = args) do
+        Process.sleep(200)
+        send(test_pid, {:ok, args, System.monotonic_time()})
+        values
+      end
+
+      def args_to_key(%{key: key}), do: key |> :erlang.term_to_binary() |> :erlang.phash2()
+
+      def update_args(%{values: values} = old_arg, %{values: new_values} = _new_arg)
+          when is_list(values) and is_list(new_values) do
+        %{old_arg | values: Enum.sort(values ++ new_values)}
+      end
+
+      def update_state_with_work_result(%{args: %{values: state_values} = args} = state, result) do
+        # because `handle_throttle()` runs in the `:continue` lifecycle of GenServer,
+        # inbox processing is paused until the logic completes. Inbox will continually get new messages,
+        # from calling `throttle()` and will be processed only after completion of `handle_throttle()`.
+        %{state | args: %{args | values: []}}
+      end
+    end
+  ```
 
   ## Using with Horde
 
@@ -200,7 +233,7 @@ defmodule Buffy.ThrottleAndTimed do
     supervisor_module = Keyword.get(opts, :supervisor_module, DynamicSupervisor)
     supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
     throttle = Keyword.fetch!(opts, :throttle)
-    loop_interval = Keyword.fetch!(opts, :loop_interval)
+    loop_interval = Keyword.get(opts, :loop_interval, :infinity)
 
     quote do
       @behaviour Buffy.ThrottleAndTimed
@@ -248,14 +281,21 @@ defmodule Buffy.ThrottleAndTimed do
 
           :ignore ->
             # already started; Trigger throttle for that process
-            key |> key_to_name |> GenServer.cast(:throttle)
+            key |> key_to_name |> GenServer.cast({:throttle, args})
 
           result ->
             result
         end
       end
 
-      defp args_to_key(args), do: args |> :erlang.term_to_binary() |> :erlang.phash2()
+      @doc """
+      Function that returns a key from incoming args.
+
+      Defaults to `args |> :erlang.term_to_binary() |> :erlang.phash2()`
+      """
+      @spec args_to_key(any()) :: non_neg_integer()
+      def args_to_key(args), do: args |> :erlang.term_to_binary() |> :erlang.phash2()
+      defoverridable args_to_key: 1
 
       defp key_to_name(key) do
         {:via, unquote(registry_module), {unquote(registry_name), {__MODULE__, key}}}
@@ -308,13 +348,14 @@ defmodule Buffy.ThrottleAndTimed do
 
       """
       @impl GenServer
-      @spec handle_cast(:throttle, Buffy.ThrottleAndTimed.state()) :: {:noreply, Buffy.ThrottleAndTimed.state()}
-      def handle_cast(:throttle, %{timer_ref: nil} = state) do
-        {:noreply, schedule_throttle_and_update_state(state)}
+      @spec handle_cast({:throttle, new_args :: any()}, Buffy.ThrottleAndTimed.state()) ::
+              {:noreply, Buffy.ThrottleAndTimed.state()}
+      def handle_cast({:throttle, new_args}, %{timer_ref: nil, args: args} = state) do
+        {:noreply, state |> schedule_throttle_and_update_state() |> Map.put(:args, update_args(args, new_args))}
       end
 
-      def handle_cast(:throttle, state) do
-        {:noreply, state}
+      def handle_cast({:throttle, new_args}, %{args: args} = state) do
+        {:noreply, %{state | args: update_args(args, new_args)}}
       end
 
       defp schedule_throttle_and_update_state(state) do
@@ -345,23 +386,49 @@ defmodule Buffy.ThrottleAndTimed do
       @spec handle_continue(do_work :: atom(), Buffy.ThrottleAndTimed.state()) ::
               {:noreply, Buffy.ThrottleAndTimed.state()} | {:noreply, Buffy.ThrottleAndTimed.state(), timeout()}
       def handle_continue(:do_work, %{key: key, args: args} = state) do
-        :telemetry.span(
-          [:buffy, :throttle, :handle],
-          %{args: args, key: key, module: __MODULE__},
-          fn ->
-            result = handle_throttle(args)
-            {result, %{args: args, key: key, module: __MODULE__, result: result}}
-          end
-        )
+        result =
+          :telemetry.span(
+            [:buffy, :throttle, :handle],
+            %{args: args, key: key, module: __MODULE__},
+            fn ->
+              result = handle_throttle(args)
+              {result, %{args: args, key: key, module: __MODULE__, result: result}}
+            end
+          )
 
-        new_state = %{state | timer_ref: nil}
+        new_state = %{update_state_with_work_result(state, result) | timer_ref: nil}
+
         {:noreply, new_state, unquote(loop_interval)}
       rescue
         e ->
           Logger.error("Error in throttle: #{inspect(e)}")
           new_state = %{state | timer_ref: nil}
+
           {:noreply, new_state, unquote(loop_interval)}
       end
+
+      @doc """
+      Updates state using a function that takes in previous args.
+      Defaults to setting the same existing args.
+      """
+      @spec update_args(prev_args :: any(), new_args :: any()) :: any()
+      def update_args(prev_args, _new_args), do: prev_args
+
+      defoverridable update_args: 2
+
+      @doc """
+      Uses result and updates state.
+      Defaults to returning the existing state.
+      """
+      @spec update_state_with_work_result(state :: %{:args => any(), any() => any()}, result :: any()) :: %{
+              :args => any(),
+              any() => any()
+            }
+      def update_state_with_work_result(state, _result) do
+        state
+      end
+
+      defoverridable update_state_with_work_result: 2
     end
   end
 end
