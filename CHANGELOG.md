@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.2.0](https://github.com/stordco/buffy/compare/v2.1.1...v2.2.0) (2024-03-13)
+
+
+### Features
+
+* SIGNAL-5811 add time interval bucket feature to ThrottleAndTimed and make loop_interval optional ([#39](https://github.com/stordco/buffy/issues/39)) ([3d48d04](https://github.com/stordco/buffy/commit/3d48d04a3b25ffb8209a79c65926c1f4a8f4debe))
+
+
+### Miscellaneous
+
+* Sync files with stordco/common-config-elixir ([#27](https://github.com/stordco/buffy/issues/27)) ([d7cffde](https://github.com/stordco/buffy/commit/d7cffdeb910491418afdd21ff8fa12e96bb00c94))
+* Sync files with stordco/common-config-elixir ([#38](https://github.com/stordco/buffy/issues/38)) ([c127668](https://github.com/stordco/buffy/commit/c1276688bfe69481abd7b6559453a6653cbc99a6))
+
 ## [2.1.1](https://github.com/stordco/buffy/compare/v2.1.0...v2.1.1) (2023-12-18)
 
 
