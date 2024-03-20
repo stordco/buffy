@@ -90,8 +90,8 @@ defmodule Buffy.ThrottleAndTimed do
 
       defmodule MyTask do
         use Buffy.ThrottleAndTimed,
-          throttle: :timer.minutes(2)
-          loop_timeout: :timer.minutes(2)
+          throttle: :timer.minutes(2),
+          loop_interval: :timer.minutes(2)
 
         def handle_throttle(args) do
           # Do something with args
@@ -162,7 +162,7 @@ defmodule Buffy.ThrottleAndTimed do
             supervisor_module: Horde.DynamicSupervisor,
             supervisor_name: MyApp.HordeDynamicSupervisor,
             throttle: :timer.minutes(2),
-            loop_timeout: :timer.minutes(10)
+            loop_interval: :timer.minutes(10)
 
           def handle_throttle(args) do
             # Do something with args
