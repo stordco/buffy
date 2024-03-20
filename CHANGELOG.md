@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/stordco/buffy/compare/v2.2.0...v2.2.1) (2024-03-20)
+
+
+### Miscellaneous
+
+* Update moduledoc module example snippets ([#41](https://github.com/stordco/buffy/issues/41)) ([2c4c8dc](https://github.com/stordco/buffy/commit/2c4c8dc11b4678498f09b0e905cfd1c1428a21a3))
+
 ## [2.2.0](https://github.com/stordco/buffy/compare/v2.1.1...v2.2.0) (2024-03-13)
 
 
