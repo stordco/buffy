@@ -51,7 +51,28 @@ defmodule Buffy.Throttle do
 
     - `:supervisor_name` (`atom`) - Optional. The name of the dynamic supervisor to use. Defaults to the built in Buffy dynamic supervisor, but if you are running in a distributed instance you can set this value to a named `Horde.DynamicSupervisor` process. Defaults to `Buffy.DynamicSupervisor`.
 
-    - :throttle (`non_neg_integer`) - Required. The minimum amount of time to wait before invoking the function. This value is in milliseconds. The actual run time could be longer than this value based on the `:jitter` option.
+    - `:throttle` (`non_neg_integer`) - Optional. The minimum amount of time to wait before invoking the function. This value is in milliseconds. The actual run time could be longer than this value based on the `:jitter` option.
+
+  ### Dynamic Options
+
+  Sometimes you want a different throttle value or jitter value based on the arguments you pass in. To deal with this, there are optional functions you can implement in your throttle module. These functions take in the arguments and will return the throttle and jitter values. For example:
+
+      defmodule MyThrottler do
+        use Buffy.Throttle,
+          registry_module: Horde.Registry,
+          registry_name: MyApp.HordeRegistry,
+          supervisor_module: Horde.DynamicSupervisor,
+          supervisor_name: MyApp.HordeDynamicSupervisor,
+          throttle: :timer.minutes(2)
+
+        def get_jitter(args) do
+          case args do
+            %Cat{} -> :timer.minutes(2)
+            %Dog{} -> :timer.seconds(10)
+            _ -> 0
+          end
+        end
+      end
 
   ## Using with Horde
 
@@ -114,7 +135,17 @@ defmodule Buffy.Throttle do
   and wait the configured `throttle` time before calling the `c:handle_throttle/1`
   function.
   """
-  @callback throttle(args :: args()) :: :ok | {:error, term()}
+  @callback throttle(args()) :: :ok | {:error, term()}
+
+  @doc """
+  Returns the amount of jitter in milliseconds to add to the throttle time.
+  """
+  @callback get_jitter(args()) :: non_neg_integer()
+
+  @doc """
+  Returns the amount of throttle time in milliseconds.
+  """
+  @callback get_throttle(args()) :: non_neg_integer()
 
   @doc """
   The function called after the throttle has completed. This function will
@@ -129,7 +160,7 @@ defmodule Buffy.Throttle do
     restart = Keyword.get(opts, :restart, :temporary)
     supervisor_module = Keyword.get(opts, :supervisor_module, DynamicSupervisor)
     supervisor_name = Keyword.get(opts, :supervisor_name, Buffy.DynamicSupervisor)
-    throttle = Keyword.fetch!(opts, :throttle)
+    throttle = Keyword.get(opts, :throttle, 0)
 
     quote do
       @behaviour Buffy.Throttle
@@ -178,6 +209,28 @@ defmodule Buffy.Throttle do
       end
 
       @doc """
+      Returns the maximum amount of jitter in milliseconds. This allows
+      for a bit of random delay before calling the `throttle/1` function
+      to avoid thundering herd problems.
+      """
+      @impl Buffy.Throttle
+      @spec get_jitter(Buffy.Throttle.args()) :: non_neg_integer()
+      def get_jitter(_args), do: unquote(jitter)
+
+      defoverridable get_jitter: 1
+
+      @doc """
+      Returns the amount of throttle in milliseconds to wait before calling
+      the `throttle/1` function. This function can be overridden to provide
+      dynamic throttling based on the passed in arguments.
+      """
+      @impl Buffy.Throttle
+      @spec get_throttle(Buffy.Throttle.args()) :: non_neg_integer()
+      def get_throttle(_args), do: unquote(throttle)
+
+      defoverridable get_throttle: 1
+
+      @doc """
       The function that runs after throttle has completed. This function will
       be called with the `t:Buffy.Throttle.key()` and can return anything. The
       return value is ignored. If an error is raised, it will be logged and
@@ -215,7 +268,8 @@ defmodule Buffy.Throttle do
       @impl GenServer
       @spec init(Buffy.Throttle.state()) :: {:ok, Buffy.Throttle.state()}
       def init({key, args}) do
-        Process.send_after(self(), :timeout, unquote(throttle))
+        throttle = get_throttle(args)
+        Process.send_after(self(), :timeout, throttle)
         {:ok, {key, args}}
       end
 
@@ -223,7 +277,8 @@ defmodule Buffy.Throttle do
       @impl GenServer
       @spec handle_info(:timeout, Buffy.Throttle.state()) :: {:stop, :normal, Buffy.Throttle.state()}
       def handle_info(:timeout, {key, args}) do
-        selected_jitter = max(:rand.uniform(unquote(jitter) + 1) - 1, 0)
+        jitter = get_jitter(args)
+        selected_jitter = max(:rand.uniform(jitter + 1) - 1, 0)
 
         :telemetry.execute([:buffy, :throttle, :handle, :jitter], %{jitter: selected_jitter}, %{
           args: args,
