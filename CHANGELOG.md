@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.0](https://github.com/stordco/buffy/compare/v2.2.0...v2.3.0) (2024-04-10)
+
+
+### Features
+
+* Add telemetry metric for process memory usage ([#43](https://github.com/stordco/buffy/issues/43)) ([b0fdb25](https://github.com/stordco/buffy/commit/b0fdb25f20b301f0dc96f9bbf0e63d5da5d7c486))
+
+
+### Miscellaneous
+
+* Sync files with stordco/common-config-elixir ([#40](https://github.com/stordco/buffy/issues/40)) ([1409ddc](https://github.com/stordco/buffy/commit/1409ddc2394e1bf34f850fb7cd67ba979fb1c66f))
+* Update moduledoc module example snippets ([#41](https://github.com/stordco/buffy/issues/41)) ([2c4c8dc](https://github.com/stordco/buffy/commit/2c4c8dc11b4678498f09b0e905cfd1c1428a21a3))
+
 ## [2.2.0](https://github.com/stordco/buffy/compare/v2.1.1...v2.2.0) (2024-03-13)
 
 
