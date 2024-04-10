@@ -189,6 +189,14 @@ defmodule Buffy.ThrottleAndTimed do
 
   - `:result` - The return value of the `handle_throttle/1` function.
 
+  ### Memory Leaks
+
+  With any sort of debounce and Elixir processes, you need to be careful about handling too many processes, or having to much state in memory at the same time. If you handle large amounts of data there is a good chance you'll end up with high memory usage and possibly affect other parts of your system.
+
+  To help monitor this usage, Buffy has a telemetry metric that measures the Elixir process memory usage. If you summarize this metric you should get a good view into your buffy throttle processes.
+
+      summary("buffy.throttle.total_heap_size", tags: [:module])
+
   """
   require Logger
 
@@ -339,7 +347,33 @@ defmodule Buffy.ThrottleAndTimed do
       @impl GenServer
       @spec init({Buffy.ThrottleAndTimed.key(), Buffy.ThrottleAndTimed.args()}) :: {:ok, Buffy.ThrottleAndTimed.state()}
       def init({key, args}) do
-        {:ok, schedule_throttle_and_update_state(%{key: key, args: args, timer_ref: nil})}
+        {:ok, schedule_throttle_and_update_state(%{key: key, args: args, timer_ref: nil}), {:continue, :measure_memory}}
+      end
+
+      @doc false
+      @impl GenServer
+      @spec handle_continue(:measure_memory, Buffy.ThrottleAndTimed.state()) ::
+              {:noreply, Buffy.ThrottleAndTimed.state()}
+      def handle_continue(:measure_memory, state) do
+        case Process.info(self(), [:total_heap_size]) do
+          [{:total_heap_size, total_heap_size}] ->
+            :telemetry.execute(
+              [:buffy, :throttle],
+              %{
+                total_heap_size: total_heap_size
+              },
+              %{
+                args: state.args,
+                key: state.key,
+                module: __MODULE__
+              }
+            )
+
+          _ ->
+            nil
+        end
+
+        {:noreply, state}
       end
 
       @doc """
