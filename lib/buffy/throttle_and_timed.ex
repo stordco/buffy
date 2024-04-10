@@ -352,9 +352,9 @@ defmodule Buffy.ThrottleAndTimed do
       end
 
       @doc """
-      Returns the amount of jitter in milliseconds to add to the throttle time.
-      By default, this is `:infinity` which causes this module to function
-      just like `Throttle`.
+      Returns the amount of time in milliseconds to wait while inbox is empty
+      until sending a `:timeout` message. By default, this is `:infinity`
+      which causes this module to function just like `Throttle`.
       """
       @impl Buffy.ThrottleAndTimed
       @spec get_loop_interval(Buffy.ThrottleAndTimed.args()) :: Buffy.ThrottleAndTimed.loop_interval()
