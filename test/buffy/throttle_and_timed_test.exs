@@ -248,6 +248,7 @@ defmodule Buffy.ThrottleAndTimedTest do
   describe ":telemetry" do
     setup do
       :telemetry_test.attach_event_handlers(self(), [
+        [:buffy, :throttle],
         [:buffy, :throttle, :throttle],
         [:buffy, :throttle, :timeout],
         [:buffy, :throttle, :handle, :start],
@@ -258,6 +259,19 @@ defmodule Buffy.ThrottleAndTimedTest do
       start_supervised!({MyDynamicSupervisor, []})
 
       :ok
+    end
+
+    test "emits [:buffy, :throttle] total_heap_size" do
+      MyZeroThrottler.throttle(:foo)
+
+      assert_receive {[:buffy, :throttle], _ref, %{total_heap_size: heap},
+                      %{
+                        args: :foo,
+                        key: _,
+                        module: MyZeroThrottler
+                      }}
+
+      assert heap > 0
     end
 
     test "emits [:buffy, :throttle, :throttle]" do
