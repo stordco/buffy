@@ -1,3 +1,4 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
 defmodule Buffy.Throttle do
   @moduledoc """
   The `Buffy.Throttle` module will wait for a specified amount of time before
