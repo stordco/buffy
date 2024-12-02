@@ -178,7 +178,7 @@ defmodule Buffy.Throttle do
           %{args: args, key: key, module: __MODULE__}
         )
 
-        case unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, {key, args}}) do
+        case unquote(supervisor_module).start_child(unquote(supervisor_name), {__MODULE__, {key, args}}, [:name, __MODULE__]) do
           {:ok, pid} -> :ok
           :ignore -> :ok
           result -> result
