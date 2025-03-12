@@ -245,6 +245,58 @@ defmodule Buffy.ThrottleAndTimedTest do
     end
   end
 
+  describe "usage: implementing self shutdown after n attempts run by loop interval" do
+    defmodule MyMaxAttemptThrottler do
+      @moduledoc false
+      use Buffy.ThrottleAndTimed,
+        throttle: 50,
+        supervisor_module: DynamicSupervisor,
+        supervisor_name: MyDynamicSupervisor,
+        loop_interval: 200
+
+      @max_attempt 2
+      def handle_throttle(_args) do
+        nil
+      end
+
+      def args_to_key(%{key: key}), do: key |> :erlang.term_to_binary() |> :erlang.phash2()
+
+      def update_state_with_work_result(%{args: args} = state, _result) do
+        %{counter: new_count} =
+          new_args =
+          Map.update(args, :counter, 0, fn v ->
+            v + 1
+          end)
+
+        if new_count == @max_attempt do
+          # we return a stop tuple which will trigger the process to stop
+          {:stop, :normal, %{state | args: args}}
+        else
+          %{test_pid: test_pid} = args
+          send(test_pid, {:ok, new_args, System.monotonic_time()})
+          %{state | args: new_args}
+        end
+      end
+    end
+
+    setup do
+      start_supervised!({MyDynamicSupervisor, []})
+      :ok
+    end
+
+    test "should stop itself after hitting the max attempt limit" do
+      test_pid = self()
+      # trigger throttle
+      task = Task.async(fn -> MyMaxAttemptThrottler.throttle(%{key: "my_key", test_pid: test_pid}) end)
+      # expect loop interval to kick in
+      assert_receive {:ok, %{counter: 0}, _}, 200
+      assert_receive {:ok, %{counter: 1}, _}, 400
+      # after hitting max attempt, expect process is stopped
+      refute_receive {:ok, _, _}, 400
+      Task.await(task)
+    end
+  end
+
   describe ":telemetry" do
     setup do
       :telemetry_test.attach_event_handlers(self(), [
