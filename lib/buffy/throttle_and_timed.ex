@@ -151,6 +151,41 @@ defmodule Buffy.ThrottleAndTimed do
     end
   ```
 
+  ### How to create a process that runs in timed interval and shuts down when hitting a threhold logic
+
+      defmodule MyMaxAttemptThrottler do
+        @moduledoc false
+        use Buffy.ThrottleAndTimed,
+          throttle: 50,
+          supervisor_module: DynamicSupervisor,
+          supervisor_name: MyDynamicSupervisor,
+          loop_interval: 200
+
+        @max_attempt 2
+        def handle_throttle(_args) do
+          nil
+        end
+
+        def args_to_key(%{key: key}), do: key |> :erlang.term_to_binary() |> :erlang.phash2()
+
+        def update_state_with_work_result(%{args: args} = state, _result) do
+          %{counter: new_count} =
+            new_args =
+            Map.update(args, :counter, 0, fn v ->
+              v + 1
+            end)
+
+          if new_count == @max_attempt do
+            # we return a stop tuple which will trigger the process to stop
+            {:stop, :normal, %{state | args: args}}
+          else
+            %{test_pid: test_pid} = args
+            send(test_pid, {:ok, new_args, System.monotonic_time()})
+            %{state | args: new_args}
+          end
+        end
+      end
+
   ## Using with Horde
 
   If you are running Elixir in a cluster, you can utilize `Horde` to only run one of your throttled functions at a time. To do this, you'll need to set the `:registry_module` and `:supervisor_module` options to `Horde.Registry` and `Horde.DynamicSupervisor` respectively. You'll also need to set the `:registry_name` and `:supervisor_name` options to the name of the Horde registry and dynamic supervisor you want to use.
@@ -430,9 +465,14 @@ defmodule Buffy.ThrottleAndTimed do
             end
           )
 
-        new_state = %{update_state_with_work_result(state, result) | timer_ref: nil}
+        case update_state_with_work_result(state, result) do
+          {:stop, _, _} = terminate_result ->
+            terminate_result
 
-        {:noreply, new_state, unquote(loop_interval)}
+          new_state ->
+            cancel_any_timer(state)
+            {:noreply, %{new_state | timer_ref: nil}, unquote(loop_interval)}
+        end
       rescue
         e ->
           Logger.error("Error in throttle: #{inspect(e)}")
@@ -453,16 +493,30 @@ defmodule Buffy.ThrottleAndTimed do
       @doc """
       Uses result and updates state.
       Defaults to returning the existing state.
+
+      Also can return the tuple of `{:stop, reason, state}`, which will invoke the
+      shutdown message and causing the GenServer to shut down
       """
-      @spec update_state_with_work_result(state :: %{:args => any(), any() => any()}, result :: any()) :: %{
-              :args => any(),
-              any() => any()
-            }
+      @spec update_state_with_work_result(state :: %{:args => any(), any() => any()}, result :: any()) ::
+              %{
+                :args => any(),
+                any() => any()
+              }
+              | {:stop, any(), any()}
       def update_state_with_work_result(state, _result) do
         state
       end
 
       defoverridable update_state_with_work_result: 2
+
+      @impl GenServer
+      def terminate(_reason, state) do
+        cancel_any_timer(state)
+        :ok
+      end
+
+      defp cancel_any_timer(%{timer_ref: nil} = _state), do: nil
+      defp cancel_any_timer(%{timer_ref: timer_ref} = _state), do: Process.cancel_timer(timer_ref)
     end
   end
 end
