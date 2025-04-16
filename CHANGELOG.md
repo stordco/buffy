@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.3.0](https://github.com/stordco/buffy/compare/v2.2.0...v2.3.0) (2025-04-16)
+
+
+### Features
+
+* Add telemetry metric for process memory usage ([#43](https://github.com/stordco/buffy/issues/43)) ([b0fdb25](https://github.com/stordco/buffy/commit/b0fdb25f20b301f0dc96f9bbf0e63d5da5d7c486))
+* Allow dynamic loop and throttle args ([#44](https://github.com/stordco/buffy/issues/44)) ([d065295](https://github.com/stordco/buffy/commit/d06529577889effbb7320d683b8952e510de88a0))
+
+
+### Miscellaneous
+
+* Create CODEOWNERS ([#48](https://github.com/stordco/buffy/issues/48)) ([b2b7920](https://github.com/stordco/buffy/commit/b2b792006f85838fa4f32c0a5b21fa8eaaf8f34e))
+* Sync files with stordco/common-config-elixir ([#40](https://github.com/stordco/buffy/issues/40)) ([1409ddc](https://github.com/stordco/buffy/commit/1409ddc2394e1bf34f850fb7cd67ba979fb1c66f))
+* Sync files with stordco/common-config-elixir ([#45](https://github.com/stordco/buffy/issues/45)) ([2971294](https://github.com/stordco/buffy/commit/297129486dd1e815289590644d38b74b5f5ad6ec))
+* Sync files with stordco/common-config-elixir ([#49](https://github.com/stordco/buffy/issues/49)) ([a468420](https://github.com/stordco/buffy/commit/a468420cce097af083b999376c7918a585a47205))
+* Update moduledoc module example snippets ([#41](https://github.com/stordco/buffy/issues/41)) ([2c4c8dc](https://github.com/stordco/buffy/commit/2c4c8dc11b4678498f09b0e905cfd1c1428a21a3))
+
 ## [2.2.0](https://github.com/stordco/buffy/compare/v2.1.1...v2.2.0) (2024-03-13)
 
 
