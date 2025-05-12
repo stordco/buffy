@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/stordco/buffy/compare/v2.3.0...v2.3.1) (2025-05-12)
+
+
+### Miscellaneous
+
+* Sync files with stordco/common-config-elixir ([#50](https://github.com/stordco/buffy/issues/50)) ([26ee1ec](https://github.com/stordco/buffy/commit/26ee1ecf0369a6cb3bb36d8035ecd534464325d7))
+
 ## [2.3.0](https://github.com/stordco/buffy/compare/v2.2.0...v2.3.0) (2025-04-16)
 
 
